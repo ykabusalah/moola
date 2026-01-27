@@ -13,6 +13,39 @@ import {
   Platform,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Helper to format date as YYYY-MM-DD
+const formatDate = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+// Helper to format date for display (MM-DD-YYYY)
+const formatDisplayDate = (date) => {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${m}-${d}-${y}`;
+};
+
+// Helper for header display (Day · Month Date)
+const formatHeaderDate = (date) => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${days[date.getDay()]} · ${months[date.getMonth()]} ${date.getDate()}`;
+};
+
+// Get start of today
+const getToday = () => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -47,6 +80,26 @@ const StarIcon = ({ color, filled }) => (
   </Svg>
 );
 
+// Export icons
+const DownloadIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M12 3v12M12 15l-4-4M12 15l4-4M5 21h14" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const MailIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Rect x="3" y="5" width="18" height="14" rx="2" stroke={color} strokeWidth="1.5" fill="none" />
+    <Path d="M3 7l9 6 9-6" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+  </Svg>
+);
+
+const CloudIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 export default function App() {
   const [dark, setDark] = useState(false);
   const [screen, setScreen] = useState('splash');
@@ -64,19 +117,37 @@ export default function App() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFreq, setRecurringFreq] = useState('monthly');
   const [expandedDates, setExpandedDates] = useState({});
+  const [expenseDate, setExpenseDate] = useState(getToday());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [onboardingDate, setOnboardingDate] = useState(getToday());
+  const [showOnboardingDatePicker, setShowOnboardingDatePicker] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const t = dark ? themes.dark : themes.light;
+  const todayStr = formatDate(getToday());
 
-  const [expenses, setExpenses] = useState([
-    { id: 1, amount: 5.50, note: 'Coffee', date: '2025-01-25', recurring: false },
-    { id: 2, amount: 12.00, note: '', date: '2025-01-25', recurring: false },
-    { id: 3, amount: 67.32, note: 'Groceries', date: '2025-01-24', recurring: false },
-    { id: 4, amount: 45.00, note: 'Gas', date: '2025-01-23', recurring: false },
-    { id: 5, amount: 1500, note: 'Rent', date: '2025-01-01', nextDue: '2025-02-01', recurring: true, freq: 'monthly' },
-    { id: 6, amount: 15.99, note: 'Netflix', date: '2025-01-15', nextDue: '2025-02-15', recurring: true, freq: 'monthly' },
-    { id: 7, amount: 89.00, note: 'Electric', date: '2025-01-10', nextDue: '2025-02-10', recurring: true, freq: 'monthly' },
-  ]);
+  const [expenses, setExpenses] = useState(() => {
+    const today = getToday();
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+    const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const midMonth = new Date(today.getFullYear(), today.getMonth(), 15);
+    const tenthOfMonth = new Date(today.getFullYear(), today.getMonth(), 10);
+    const nextMonth1 = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const nextMonth15 = new Date(today.getFullYear(), today.getMonth() + 1, 15);
+    const nextMonth10 = new Date(today.getFullYear(), today.getMonth() + 1, 10);
+    const nextMonthSameDay = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+    
+    return [
+      { id: 1, amount: 5.50, note: 'Coffee', date: formatDate(today), recurring: false },
+      { id: 2, amount: 12.00, note: '', date: formatDate(today), recurring: false },
+      { id: 3, amount: 67.32, note: 'Groceries', date: formatDate(yesterday), recurring: false },
+      { id: 4, amount: 45.00, note: 'Gas', date: formatDate(twoDaysAgo), recurring: false },
+      { id: 5, amount: 1500, note: 'Rent', date: formatDate(startOfMonth), nextDue: formatDate(nextMonth1), recurring: true, freq: 'monthly' },
+      { id: 6, amount: 15.99, note: 'Netflix', date: formatDate(midMonth), nextDue: formatDate(nextMonth15), recurring: true, freq: 'monthly' },
+      { id: 7, amount: 89.00, note: 'Electric', date: formatDate(tenthOfMonth), nextDue: formatDate(nextMonth10), recurring: true, freq: 'monthly' },
+    ];
+  });
 
   const transition = (next) => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
@@ -93,7 +164,7 @@ export default function App() {
   }, []);
 
   const getDaysUntil = (dateStr) => {
-    const today = new Date('2025-01-25');
+    const today = getToday();
     const due = new Date(dateStr);
     const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
     if (diff === 0) return 'due today';
@@ -102,15 +173,22 @@ export default function App() {
     return `in ${diff}d`;
   };
 
-  const today = expenses.filter(e => e.date === '2025-01-25');
-  const week = expenses.filter(e => e.date >= '2025-01-19' && e.date <= '2025-01-25');
-  const month = expenses.filter(e => e.date.startsWith('2025-01'));
+  // Dynamic date filtering
+  const today = getToday();
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 6);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  
+  const todayExpenses = expenses.filter(e => e.date === todayStr);
+  const weekExpenses = expenses.filter(e => e.date >= formatDate(weekAgo) && e.date <= todayStr);
+  const monthExpenses = expenses.filter(e => e.date >= formatDate(monthStart) && e.date <= todayStr);
+  const yearExpenses = expenses.filter(e => e.date >= formatDate(yearStart) && e.date <= todayStr);
 
   const getData = () => {
-    if (period === 'today') return { items: today, total: today.reduce((s, e) => s + e.amount, 0) };
-    if (period === 'week') return { items: week, total: week.reduce((s, e) => s + e.amount, 0) };
-    if (period === 'month') return { items: month, total: month.reduce((s, e) => s + e.amount, 0) };
-    return { items: expenses, total: expenses.reduce((s, e) => s + e.amount, 0) };
+    if (period === 'today') return { items: todayExpenses, total: todayExpenses.reduce((s, e) => s + e.amount, 0) };
+    if (period === 'week') return { items: weekExpenses, total: weekExpenses.reduce((s, e) => s + e.amount, 0) };
+    if (period === 'month') return { items: monthExpenses, total: monthExpenses.reduce((s, e) => s + e.amount, 0) };
+    return { items: yearExpenses, total: yearExpenses.reduce((s, e) => s + e.amount, 0) };
   };
 
   const { items, total } = getData();
@@ -131,22 +209,29 @@ export default function App() {
 
   const openAdd = () => {
     setEditingExpense(null); setAmount(''); setNote(''); setIsRecurring(false);
-    setShowSuccess(false); setShowAdd(true);
+    setExpenseDate(getToday()); setShowSuccess(false); setShowAdd(true);
   };
 
   const openEdit = (e) => {
     setEditingExpense(e); setAmount(e.amount.toString()); setNote(e.note);
-    setIsRecurring(e.recurring); setRecurringFreq(e.freq || 'monthly'); setShowAdd(true);
+    setIsRecurring(e.recurring); setRecurringFreq(e.freq || 'monthly');
+    setExpenseDate(new Date(e.date + 'T00:00:00')); setShowAdd(true);
   };
 
   const saveExpense = () => {
     if (!amount) return;
     const savedAmount = parseFloat(amount).toFixed(2);
+    const dateStr = formatDate(expenseDate);
+    const nextDueDate = new Date(expenseDate);
+    if (recurringFreq === 'weekly') nextDueDate.setDate(nextDueDate.getDate() + 7);
+    else if (recurringFreq === 'monthly') nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+    else if (recurringFreq === 'yearly') nextDueDate.setFullYear(nextDueDate.getFullYear() + 1);
+    
     if (editingExpense) {
-      setExpenses(expenses.map(e => e.id === editingExpense.id ? { ...e, amount: parseFloat(amount), note, recurring: isRecurring, freq: recurringFreq } : e));
+      setExpenses(expenses.map(e => e.id === editingExpense.id ? { ...e, amount: parseFloat(amount), note, date: dateStr, recurring: isRecurring, freq: recurringFreq, nextDue: isRecurring ? formatDate(nextDueDate) : null } : e));
       setShowAdd(false); setEditingExpense(null);
     } else {
-      setExpenses([{ id: Date.now(), amount: parseFloat(amount), note, date: '2025-01-25', recurring: isRecurring, freq: isRecurring ? recurringFreq : null, nextDue: isRecurring ? '2025-02-25' : null }, ...expenses]);
+      setExpenses([{ id: Date.now(), amount: parseFloat(amount), note, date: dateStr, recurring: isRecurring, freq: isRecurring ? recurringFreq : null, nextDue: isRecurring ? formatDate(nextDueDate) : null }, ...expenses]);
       setSuccessAmount(savedAmount); setShowSuccess(true);
       setTimeout(() => { setShowSuccess(false); setShowAdd(false); setAmount(''); setNote(''); setIsRecurring(false); }, 1600);
     }
@@ -155,6 +240,29 @@ export default function App() {
   const deleteExpense = () => {
     setExpenses(expenses.filter(e => e.id !== editingExpense.id));
     setShowAdd(false); setEditingExpense(null);
+  };
+
+  const exportToCSV = async () => {
+    try {
+      const header = 'Date,Amount,Note,Recurring,Frequency\n';
+      const rows = expenses
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .map(e => `${e.date},${e.amount.toFixed(2)},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`)
+        .join('\n');
+      const csv = header + rows;
+      
+      const filename = `moola-export-${formatDate(getToday())}.csv`;
+      const filepath = FileSystem.documentDirectory + filename;
+      
+      await FileSystem.writeAsStringAsync(filepath, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filepath, { mimeType: 'text/csv', dialogTitle: 'Export Expenses' });
+      }
+      setShowExport(false);
+    } catch (error) {
+      console.log('Export error:', error);
+    }
   };
 
   // Splash Screen
@@ -222,16 +330,36 @@ export default function App() {
       if (onboardingStep === 2) {
         return (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-            <Svg width={60} height={60} viewBox="0 0 60 60" style={{ marginBottom: 32 }}>
-              <Circle cx={30} cy={30} r={25} stroke={t.border} strokeWidth={1} fill="none" strokeDasharray="4 3" />
-              <Svg x={18} y={22}><Text style={{ fontSize: 14, fill: t.sub }}>25</Text></Svg>
-            </Svg>
+            <View style={{ marginBottom: 32, alignItems: 'center', justifyContent: 'center' }}>
+              <Svg width={60} height={60} viewBox="0 0 60 60">
+                <Circle cx={30} cy={30} r={25} stroke={t.border} strokeWidth={1} fill="none" strokeDasharray="4 3" />
+              </Svg>
+              <Text style={{ position: 'absolute', fontSize: 14, color: t.sub }}>{onboardingDate.getDate()}</Text>
+            </View>
             <Text style={{ fontSize: 12, color: t.sub, marginBottom: 12, letterSpacing: 3 }}>FIRST MARK</Text>
             <Text style={{ fontSize: 22, fontWeight: '400', color: t.text, marginBottom: 12, textAlign: 'center' }}>When shall we begin?</Text>
             <Text style={{ fontSize: 13, color: t.sub, marginBottom: 40, textAlign: 'center', fontStyle: 'italic' }}>We'll mark your spending from this day.</Text>
-            <View style={{ borderWidth: 1, borderColor: t.border, borderRadius: 2, padding: 12 }}>
-              <Text style={{ fontSize: 16, color: t.text }}>{startDate}</Text>
-            </View>
+            <TouchableOpacity onPress={() => setShowOnboardingDatePicker(true)} style={{ borderWidth: 1, borderColor: t.border, borderRadius: 2, padding: 12 }}>
+              <Text style={{ fontSize: 16, color: t.text }}>{formatDisplayDate(onboardingDate)}</Text>
+            </TouchableOpacity>
+            {showOnboardingDatePicker && (
+              <DateTimePicker
+                value={onboardingDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={getToday()}
+                onChange={(event, selectedDate) => {
+                  setShowOnboardingDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) setOnboardingDate(selectedDate);
+                }}
+                themeVariant={dark ? 'dark' : 'light'}
+              />
+            )}
+            {showOnboardingDatePicker && Platform.OS === 'ios' && (
+              <TouchableOpacity onPress={() => setShowOnboardingDatePicker(false)} style={{ marginTop: 12 }}>
+                <Text style={{ color: t.soul, fontSize: 13, letterSpacing: 1 }}>Done</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => transition(3)} style={{ marginTop: 48, paddingVertical: 14, paddingHorizontal: 44, backgroundColor: t.text, borderRadius: 2 }}>
               <Text style={{ color: t.bg, fontSize: 12, letterSpacing: 2 }}>CONTINUE</Text>
             </TouchableOpacity>
@@ -284,7 +412,7 @@ export default function App() {
           <View style={{ padding: 24, paddingTop: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View>
               <Text style={{ fontSize: 10, color: t.sub, letterSpacing: 2, fontStyle: 'italic' }}>
-                {period === 'today' ? 'Sat · January 25' : period === 'week' ? 'This Week' : period === 'month' ? 'January 2025' : 'Year 2025'}
+                {period === 'today' ? formatHeaderDate(getToday()) : period === 'week' ? 'This Week' : period === 'month' ? `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][getToday().getMonth()]} ${getToday().getFullYear()}` : `Year ${getToday().getFullYear()}`}
               </Text>
               <Text style={{ fontSize: 42, fontWeight: '300', marginTop: 8, color: t.text, letterSpacing: -1 }}>
                 ${total.toFixed(2).split('.')[0]}
@@ -354,7 +482,7 @@ export default function App() {
                       <Svg width={10} height={10} viewBox="0 0 10 10" style={{ transform: [{ rotate: expandedDates[date] ? '90deg' : '0deg' }] }}>
                         <Path d="M3,1 L7,5 L3,9" stroke={t.sub} strokeWidth={1.5} fill="none" />
                       </Svg>
-                      <Text style={{ fontSize: 12, color: t.text, letterSpacing: 1 }}>{date.split('-')[1]}/{date.split('-')[2]}</Text>
+                      <Text style={{ fontSize: 12, color: t.text, letterSpacing: 1 }}>{date.split('-')[1]}-{date.split('-')[2]}</Text>
                     </View>
                     <Text style={{ fontSize: 12, color: t.sub, fontStyle: 'italic' }}>${group.total.toFixed(2)}</Text>
                   </TouchableOpacity>
@@ -394,15 +522,31 @@ export default function App() {
             <View style={{ backgroundColor: t.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 24, borderWidth: 1, borderColor: t.border, borderBottomWidth: 0 }}>
               <View style={{ width: 40, height: 4, backgroundColor: t.muted, borderRadius: 2, alignSelf: 'center', marginBottom: 24 }} />
               <Text style={{ fontSize: 15, color: t.text, marginBottom: 20, fontStyle: 'italic' }}>Export your records</Text>
-              {[{ title: 'Download CSV', desc: 'Excel, Sheets, Numbers', active: true }, { title: 'Send via Email', desc: 'To your inbox', active: false }, { title: 'Save to Cloud', desc: 'Drive, iCloud, Dropbox', active: false }].map((opt, i) => (
-                <TouchableOpacity key={i} disabled={!opt.active} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border, opacity: opt.active ? 1 : 0.4 }}>
-                  <Text style={{ color: t.soul, fontSize: 14 }}>◇</Text>
-                  <View>
-                    <Text style={{ fontSize: 13, color: t.text }}>{opt.title}</Text>
-                    <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>{opt.desc}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              
+              <TouchableOpacity onPress={exportToCSV} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border }}>
+                <DownloadIcon color={t.soul} />
+                <View>
+                  <Text style={{ fontSize: 13, color: t.text }}>Download CSV</Text>
+                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Excel, Sheets, Numbers</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity disabled style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border, opacity: 0.4 }}>
+                <MailIcon color={t.soul} />
+                <View>
+                  <Text style={{ fontSize: 13, color: t.text }}>Send via Email</Text>
+                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Coming soon</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity disabled style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border, opacity: 0.4 }}>
+                <CloudIcon color={t.soul} />
+                <View>
+                  <Text style={{ fontSize: 13, color: t.text }}>Save to Cloud</Text>
+                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Coming soon</Text>
+                </View>
+              </TouchableOpacity>
+              
               <TouchableOpacity onPress={() => setShowExport(false)} style={{ marginTop: 16, padding: 12, backgroundColor: t.muted, borderRadius: 2, alignItems: 'center' }}>
                 <Text style={{ color: t.sub, fontSize: 11, letterSpacing: 1 }}>CLOSE</Text>
               </TouchableOpacity>
@@ -412,10 +556,10 @@ export default function App() {
 
         {/* Add/Edit Modal */}
         <Modal visible={showAdd} animationType="fade">
-          <View style={{ flex: 1, backgroundColor: t.bg, padding: 28 }}>
+          <View style={{ flex: 1, backgroundColor: t.bg }}>
             <SafeAreaView style={{ flex: 1 }}>
               {showSuccess ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 }}>
                   <Svg width={64} height={64} viewBox="0 0 64 64" style={{ marginBottom: 24 }}>
                     <Circle cx={32} cy={32} r={28} stroke={t.soul} strokeWidth={2} fill="none" />
                     <Path d="M20 32 L28 40 L44 24" stroke={t.soul} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -424,10 +568,10 @@ export default function App() {
                   <Text style={{ fontSize: 13, color: t.sub, marginTop: 8, fontStyle: 'italic' }}>added to your records</Text>
                 </View>
               ) : (
-                <>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 28, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
                     <Text style={{ fontSize: 13, color: t.text, letterSpacing: 2, fontStyle: 'italic' }}>{editingExpense ? 'edit record' : 'new record'}</Text>
-                    <TouchableOpacity onPress={() => { setShowAdd(false); setEditingExpense(null); }}>
+                    <TouchableOpacity onPress={() => { setShowAdd(false); setEditingExpense(null); setShowDatePicker(false); }}>
                       <Text style={{ fontSize: 20, color: t.sub }}>×</Text>
                     </TouchableOpacity>
                   </View>
@@ -455,6 +599,16 @@ export default function App() {
                     style={{ fontSize: 15, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border, color: t.text, fontStyle: 'italic', marginBottom: 24 }}
                   />
 
+                  <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 8 }}>DATE</Text>
+                  <TouchableOpacity 
+                    onPress={() => setShowDatePicker(true)} 
+                    style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border, marginBottom: 24 }}
+                  >
+                    <Text style={{ fontSize: 15, color: t.text }}>
+                      {formatDate(expenseDate) === todayStr ? 'Today' : formatDisplayDate(expenseDate)}
+                    </Text>
+                  </TouchableOpacity>
+
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18, borderTopWidth: 1, borderTopColor: t.border }}>
                     <View>
                       <Text style={{ fontSize: 14, color: t.text }}>Recurring</Text>
@@ -478,7 +632,7 @@ export default function App() {
                     </View>
                   )}
 
-                  <View style={{ marginTop: 'auto', paddingTop: 24, flexDirection: 'row', gap: 12 }}>
+                  <View style={{ paddingTop: 24, flexDirection: 'row', gap: 12 }}>
                     {editingExpense && (
                       <TouchableOpacity onPress={deleteExpense} style={{ paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1, borderColor: dark ? '#6b4040' : '#c49090', borderRadius: 2 }}>
                         <Text style={{ color: dark ? '#c08080' : '#906060', fontSize: 11, letterSpacing: 1 }}>DELETE</Text>
@@ -488,9 +642,37 @@ export default function App() {
                       <Text style={{ color: amount ? '#fff' : t.sub, fontSize: 11, letterSpacing: 2 }}>{editingExpense ? 'SAVE' : 'ADD'}</Text>
                     </TouchableOpacity>
                   </View>
-                </>
+                </ScrollView>
               )}
             </SafeAreaView>
+            
+            {/* Date Picker Modal */}
+            <Modal visible={showDatePicker} transparent animationType="fade">
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                <View style={{ backgroundColor: t.card, borderRadius: 12, width: '100%', maxWidth: 320, borderWidth: 1, borderColor: t.border }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: t.sub, fontSize: 14 }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={{ color: t.text, fontSize: 15, fontWeight: '500' }}>Select Date</Text>
+                    <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: t.soul, fontSize: 14, fontWeight: '500' }}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={expenseDate}
+                    mode="date"
+                    display="spinner"
+                    maximumDate={getToday()}
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) setExpenseDate(selectedDate);
+                    }}
+                    themeVariant={dark ? 'dark' : 'light'}
+                    style={{ height: 180 }}
+                  />
+                </View>
+              </View>
+            </Modal>
           </View>
         </Modal>
       </SafeAreaView>
