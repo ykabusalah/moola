@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 
 // Helper to format date as YYYY-MM-DD
 const formatDate = (date) => {
@@ -80,23 +81,36 @@ const StarIcon = ({ color, filled }) => (
   </Svg>
 );
 
+// Header export icon
+const ExportIcon = ({ color }) => (
+  <Svg width={18} height={18} viewBox="0 0 24 24">
+    <Path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M7 10l5 5 5-5" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 15V3" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+  </Svg>
+);
+
 // Export icons
-const DownloadIcon = ({ color }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24">
-    <Path d="M12 3v12M12 15l-4-4M12 15l4-4M5 21h14" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+const ShareIcon = ({ color }) => (
+  <Svg width={22} height={22} viewBox="0 0 24 24">
+    <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M16 6l-4-4-4 4" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 2v13" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" />
   </Svg>
 );
 
-const MailIcon = ({ color }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24">
-    <Rect x="3" y="5" width="18" height="14" rx="2" stroke={color} strokeWidth="1.5" fill="none" />
-    <Path d="M3 7l9 6 9-6" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+const CopyIcon = ({ color }) => (
+  <Svg width={22} height={22} viewBox="0 0 24 24">
+    <Rect x="9" y="9" width="13" height="13" rx="2" stroke={color} strokeWidth="1.5" fill="none" />
+    <Path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" />
   </Svg>
 );
 
-const CloudIcon = ({ color }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24">
-    <Path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+const SaveIcon = ({ color }) => (
+  <Svg width={22} height={22} viewBox="0 0 24 24">
+    <Path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M17 21v-8H7v8" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M7 3v5h8" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 
@@ -242,19 +256,21 @@ export default function App() {
     setShowAdd(false); setEditingExpense(null);
   };
 
-  const exportToCSV = async () => {
+  const generateCSV = () => {
+    const header = 'Date,Amount,Note,Recurring,Frequency\n';
+    const rows = expenses
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(e => `${e.date},${e.amount.toFixed(2)},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`)
+      .join('\n');
+    return header + rows;
+  };
+
+  const exportShare = async () => {
     try {
-      const header = 'Date,Amount,Note,Recurring,Frequency\n';
-      const rows = expenses
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .map(e => `${e.date},${e.amount.toFixed(2)},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`)
-        .join('\n');
-      const csv = header + rows;
-      
+      const csv = generateCSV();
       const filename = `moola-export-${formatDate(getToday())}.csv`;
       const filepath = FileSystem.documentDirectory + filename;
-      
-      await FileSystem.writeAsStringAsync(filepath, csv, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(filepath, csv, { encoding: 'utf8' });
       
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filepath, { mimeType: 'text/csv', dialogTitle: 'Export Expenses' });
@@ -262,6 +278,36 @@ export default function App() {
       setShowExport(false);
     } catch (error) {
       console.log('Export error:', error);
+    }
+  };
+
+  const exportCopy = async () => {
+    try {
+      const csv = generateCSV();
+      await Clipboard.setStringAsync(csv);
+      setShowExport(false);
+    } catch (error) {
+      console.log('Copy error:', error);
+    }
+  };
+
+  const exportSave = async () => {
+    try {
+      const csv = generateCSV();
+      const filename = `moola-export-${formatDate(getToday())}.csv`;
+      const filepath = FileSystem.documentDirectory + filename;
+      await FileSystem.writeAsStringAsync(filepath, csv, { encoding: 'utf8' });
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filepath, { 
+          mimeType: 'text/csv', 
+          dialogTitle: 'Save Expenses',
+          UTI: 'public.comma-separated-values-text'
+        });
+      }
+      setShowExport(false);
+    } catch (error) {
+      console.log('Save error:', error);
     }
   };
 
@@ -421,7 +467,7 @@ export default function App() {
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity onPress={() => setShowExport(true)} style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: t.border, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ color: t.sub, fontSize: 13 }}>↓</Text>
+                <ExportIcon color={t.sub} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setDark(!dark)} style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: t.border, justifyContent: 'center', alignItems: 'center' }}>
                 <Text style={{ fontSize: 14, color: dark ? '#fff' : t.ink }}>☾</Text>
@@ -521,33 +567,34 @@ export default function App() {
           <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowExport(false)}>
             <View style={{ backgroundColor: t.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 24, borderWidth: 1, borderColor: t.border, borderBottomWidth: 0 }}>
               <View style={{ width: 40, height: 4, backgroundColor: t.muted, borderRadius: 2, alignSelf: 'center', marginBottom: 24 }} />
-              <Text style={{ fontSize: 15, color: t.text, marginBottom: 20, fontStyle: 'italic' }}>Export your records</Text>
+              <Text style={{ fontSize: 15, color: t.text, marginBottom: 8, fontStyle: 'italic' }}>Export your records</Text>
+              <Text style={{ fontSize: 11, color: t.sub, marginBottom: 20 }}>{expenses.length} expenses</Text>
               
-              <TouchableOpacity onPress={exportToCSV} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border }}>
-                <DownloadIcon color={t.soul} />
-                <View>
-                  <Text style={{ fontSize: 13, color: t.text }}>Download CSV</Text>
-                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Excel, Sheets, Numbers</Text>
+              <TouchableOpacity onPress={exportShare} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
+                <ShareIcon color={t.soul} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: t.text }}>Share</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Send via email, message, airdrop</Text>
                 </View>
               </TouchableOpacity>
               
-              <TouchableOpacity disabled style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border, opacity: 0.4 }}>
-                <MailIcon color={t.soul} />
-                <View>
-                  <Text style={{ fontSize: 13, color: t.text }}>Send via Email</Text>
-                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Coming soon</Text>
+              <TouchableOpacity onPress={exportCopy} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
+                <CopyIcon color={t.soul} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: t.text }}>Copy to Clipboard</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Paste into any app</Text>
                 </View>
               </TouchableOpacity>
               
-              <TouchableOpacity disabled style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: t.border, opacity: 0.4 }}>
-                <CloudIcon color={t.soul} />
-                <View>
-                  <Text style={{ fontSize: 13, color: t.text }}>Save to Cloud</Text>
-                  <Text style={{ fontSize: 10, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Coming soon</Text>
+              <TouchableOpacity onPress={exportSave} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
+                <SaveIcon color={t.soul} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: t.text }}>Save as CSV</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Excel, Sheets, Numbers</Text>
                 </View>
               </TouchableOpacity>
               
-              <TouchableOpacity onPress={() => setShowExport(false)} style={{ marginTop: 16, padding: 12, backgroundColor: t.muted, borderRadius: 2, alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => setShowExport(false)} style={{ marginTop: 20, padding: 14, backgroundColor: t.muted, borderRadius: 2, alignItems: 'center' }}>
                 <Text style={{ color: t.sub, fontSize: 11, letterSpacing: 1 }}>CLOSE</Text>
               </TouchableOpacity>
             </View>
