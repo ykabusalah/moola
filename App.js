@@ -11,12 +11,20 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Storage keys
+const STORAGE_KEYS = {
+  EXPENSES: '@moola/expenses',
+  PREFERENCES: '@moola/preferences',
+};
 
 // Helper to format date as YYYY-MM-DD
 const formatDate = (date) => {
@@ -115,10 +123,11 @@ const SaveIcon = ({ color }) => (
 );
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [dark, setDark] = useState(false);
   const [screen, setScreen] = useState('splash');
   const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState('2025-01-25');
+  const [startDate, setStartDate] = useState('');
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [period, setPeriod] = useState('today');
   const [showAdd, setShowAdd] = useState(false);
@@ -135,33 +144,92 @@ export default function App() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [onboardingDate, setOnboardingDate] = useState(getToday());
   const [showOnboardingDatePicker, setShowOnboardingDatePicker] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [expenses, setExpenses] = useState([]);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const splashTimerRef = useRef(false);
   const t = dark ? themes.dark : themes.light;
   const todayStr = formatDate(getToday());
 
-  const [expenses, setExpenses] = useState(() => {
-    const today = getToday();
-    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-    const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const midMonth = new Date(today.getFullYear(), today.getMonth(), 15);
-    const tenthOfMonth = new Date(today.getFullYear(), today.getMonth(), 10);
-    const nextMonth1 = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    const nextMonth15 = new Date(today.getFullYear(), today.getMonth() + 1, 15);
-    const nextMonth10 = new Date(today.getFullYear(), today.getMonth() + 1, 10);
-    const nextMonthSameDay = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-    
-    return [
-      { id: 1, amount: 5.50, note: 'Coffee', date: formatDate(today), recurring: false },
-      { id: 2, amount: 12.00, note: '', date: formatDate(today), recurring: false },
-      { id: 3, amount: 67.32, note: 'Groceries', date: formatDate(yesterday), recurring: false },
-      { id: 4, amount: 45.00, note: 'Gas', date: formatDate(twoDaysAgo), recurring: false },
-      { id: 5, amount: 1500, note: 'Rent', date: formatDate(startOfMonth), nextDue: formatDate(nextMonth1), recurring: true, freq: 'monthly' },
-      { id: 6, amount: 15.99, note: 'Netflix', date: formatDate(midMonth), nextDue: formatDate(nextMonth15), recurring: true, freq: 'monthly' },
-      { id: 7, amount: 89.00, note: 'Electric', date: formatDate(tenthOfMonth), nextDue: formatDate(nextMonth10), recurring: true, freq: 'monthly' },
-    ];
-  });
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Save expenses when they change (skip initial empty state)
+  useEffect(() => {
+    if (!isLoading && expenses.length >= 0) {
+      saveExpenses();
+    }
+  }, [expenses]);
+
+  // Save preferences when they change
+  useEffect(() => {
+    if (!isLoading && onboardingComplete) {
+      savePreferences();
+    }
+  }, [dark, name, onboardingComplete]);
+
+  const loadData = async () => {
+    try {
+      const [expensesData, prefsData] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.EXPENSES),
+        AsyncStorage.getItem(STORAGE_KEYS.PREFERENCES),
+      ]);
+
+      if (expensesData) {
+        setExpenses(JSON.parse(expensesData));
+      }
+
+      if (prefsData) {
+        const prefs = JSON.parse(prefsData);
+        setName(prefs.name || '');
+        setDark(prefs.dark || false);
+        setStartDate(prefs.startDate || '');
+        setOnboardingComplete(prefs.onboardingComplete || false);
+        
+        // Skip to main if onboarding was completed
+        if (prefs.onboardingComplete) {
+          setScreen('main');
+        }
+      }
+    } catch (error) {
+      console.log('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveExpenses = async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+    } catch (error) {
+      console.log('Error saving expenses:', error);
+    }
+  };
+
+  const savePreferences = async () => {
+    try {
+      const prefs = {
+        name,
+        dark,
+        startDate,
+        onboardingComplete,
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.PREFERENCES, JSON.stringify(prefs));
+    } catch (error) {
+      console.log('Error saving preferences:', error);
+    }
+  };
+
+  const completeOnboarding = () => {
+    setStartDate(formatDate(onboardingDate));
+    setOnboardingComplete(true);
+    transition('main');
+  };
+
+
 
   const transition = (next) => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
@@ -172,10 +240,17 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (screen === 'splash') {
-      setTimeout(() => transition('onboarding'), 2200);
+    if (screen === 'splash' && !isLoading && !splashTimerRef.current) {
+      splashTimerRef.current = true;
+      setTimeout(() => {
+        if (onboardingComplete) {
+          transition('main');
+        } else {
+          transition('onboarding');
+        }
+      }, 2200);
     }
-  }, []);
+  }, [screen, isLoading, onboardingComplete]);
 
   const getDaysUntil = (dateStr) => {
     const today = getToday();
@@ -311,6 +386,16 @@ export default function App() {
     }
   };
 
+  // Loading screen
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: dark ? themes.dark.bg : themes.light.bg, justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+        <SketchCircle size={60} color={dark ? themes.dark.soul : themes.light.ink} />
+      </View>
+    );
+  }
+
   // Splash Screen
   if (screen === 'splash') {
     return (
@@ -426,7 +511,7 @@ export default function App() {
               <Text style={{ marginLeft: 14, fontSize: 13, color: t.sub, fontStyle: 'italic' }}>{txt}</Text>
             </View>
           ))}
-          <TouchableOpacity onPress={() => transition('main')} style={{ marginTop: 36, paddingVertical: 16, paddingHorizontal: 52, backgroundColor: t.soul, borderRadius: 2 }}>
+          <TouchableOpacity onPress={completeOnboarding} style={{ marginTop: 36, paddingVertical: 16, paddingHorizontal: 52, backgroundColor: t.soul, borderRadius: 2 }}>
             <Text style={{ color: '#fff', fontSize: 12, letterSpacing: 2 }}>ENTER</Text>
           </TouchableOpacity>
         </View>
