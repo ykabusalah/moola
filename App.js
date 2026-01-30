@@ -12,6 +12,7 @@ import {
   Dimensions,
   Platform,
   Linking,
+  AppState,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -19,27 +20,30 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 // ============================================
 // STORAGE KEYS
-// using prefixed keys to avoid collisions with other apps
 // ============================================
 const STORAGE_KEYS = {
   EXPENSES: '@moola/expenses',
   PREFERENCES: '@moola/preferences',
 };
 
+const SECURE_KEYS = {
+  PIN: 'moola_pin',
+  LOCK_METHOD: 'moola_lock_method', // 'none' | 'pin' | 'biometric' | 'both'
+};
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================
 // CONFIGURATION
-// change these to customize the app
 // ============================================
 
 const SUPPORT_LINK = 'https://ko-fi.com/ykabusalah';
 
-// accent color options - each has light and dark variants
-// dim is for backgrounds, regular color is for text/icons
 const ACCENT_COLORS = [
   { id: 'sage', name: 'Sage', color: '#5a7c4a', dim: '#e8f0e4', darkColor: '#6b9b54', darkDim: '#1a2e14' },
   { id: 'ocean', name: 'Ocean', color: '#4a7c9b', dim: '#e4f0f4', darkColor: '#4a9eff', darkDim: '#1a3a5c' },
@@ -48,8 +52,6 @@ const ACCENT_COLORS = [
   { id: 'slate', name: 'Slate', color: '#5a6a7c', dim: '#e8ecf0', darkColor: '#8a9eb4', darkDim: '#1a2430' },
 ];
 
-// pretty comprehensive currency list
-// symbols might look weird in some fonts but ¯\_(ツ)_/¯
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
@@ -79,10 +81,8 @@ const CURRENCIES = [
 
 // ============================================
 // DATE HELPERS
-// these get used all over the place
 // ============================================
 
-// formats date for storage/comparison (YYYY-MM-DD)
 const formatDate = (date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -90,7 +90,6 @@ const formatDate = (date) => {
   return `${y}-${m}-${d}`;
 };
 
-// formats date for display (MM-DD-YYYY) - american style
 const formatDisplayDate = (date) => {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
@@ -98,14 +97,12 @@ const formatDisplayDate = (date) => {
   return `${m}-${d}-${y}`;
 };
 
-// fancy header format like "Mon · January 25"
 const formatHeaderDate = (date) => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return `${days[date.getDay()]} · ${months[date.getMonth()]} ${date.getDate()}`;
 };
 
-// returns today at midnight (for consistent comparisons)
 const getToday = () => {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
@@ -114,32 +111,30 @@ const getToday = () => {
 
 // ============================================
 // THEME COLORS
-// hollow knight inspired aesthetic
-// warm browns for light, cool blues for dark
 // ============================================
 const themes = {
   light: {
-    bg: '#faf9f6',      // warm off-white
+    bg: '#faf9f6',
     card: '#ffffff',
-    text: '#2a251c',    // dark brown
-    sub: '#8a8070',     // muted brown
+    text: '#2a251c',
+    sub: '#8a8070',
     muted: '#e8e4dc',
     accent: '#2a251c',
     border: '#d4cfc4',
-    soul: '#5a7c4a',    // the green "soul" color - main accent
-    soulDim: '#e8f0e4', // light tint of soul
+    soul: '#5a7c4a',
+    soulDim: '#e8f0e4',
     void: '#2a251c',
     ink: '#3a3428',
   },
   dark: {
-    bg: '#0f1114',      // near black
+    bg: '#0f1114',
     card: '#181b20',
     text: '#e8e4dc',
     sub: '#6b7280',
     muted: '#2a2f38',
     accent: '#e8e4dc',
     border: '#3a3f4a',
-    soul: '#4a9eff',    // blue in dark mode
+    soul: '#4a9eff',
     soulDim: '#1a3a5c',
     void: '#050608',
     ink: '#e8e4dc',
@@ -148,25 +143,20 @@ const themes = {
 
 // ============================================
 // SVG COMPONENTS
-// hand-drawn wobbly aesthetic
-// these use quadratic beziers to look organic
 // ============================================
 
-// the main logo circle - intentionally imperfect
 const SketchCircle = ({ size, color }) => (
   <Svg width={size} height={size} viewBox="0 0 60 60">
     <Path d="M30,5 Q50,3 55,25 Q57,50 30,55 Q8,57 5,30 Q3,10 30,5" stroke={color} strokeWidth="1.5" fill="none" />
   </Svg>
 );
 
-// wavy horizontal line divider
 const Divider = ({ color }) => (
   <Svg width="100%" height={8} viewBox="0 0 300 8" preserveAspectRatio="none">
     <Path d="M0,4 Q15,2 30,4 T60,4 T90,4 T120,4 T150,4 T180,4 T210,4 T240,4 T270,4 L300,4" stroke={color} strokeWidth={1} fill="none" opacity={0.4} />
   </Svg>
 );
 
-// 4-point star for decorative purposes
 const StarIcon = ({ color, filled }) => (
   <Svg width={24} height={24} viewBox="0 0 24 24">
     <Path d="M12,2 L14,10 L22,12 L14,14 L12,22 L10,14 L2,12 L10,10 Z" stroke={color} fill={filled ? color : 'none'} strokeWidth="0.5" opacity={filled ? 0.8 : 1} />
@@ -175,8 +165,6 @@ const StarIcon = ({ color, filled }) => (
 
 // ============================================
 // ICON COMPONENTS
-// all icons are custom SVGs to match the aesthetic
-// keeping them simple and thin stroked
 // ============================================
 
 const ExportIcon = ({ color }) => (
@@ -257,16 +245,32 @@ const CoffeeIcon = ({ color }) => (
   </Svg>
 );
 
+const LockIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke={color} strokeWidth="1.5" fill="none" />
+    <Path d="M7 11V7a5 5 0 0110 0v4" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const FaceIdIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="9" cy="9" r="1" fill={color} />
+    <Circle cx="15" cy="9" r="1" fill={color} />
+    <Path d="M9 15c.83.67 2 1 3 1s2.17-.33 3-1" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // ============================================
 // MAIN APP COMPONENT
 // ============================================
 export default function App() {
-  // loading state - wait for asyncstorage before rendering
+  // loading state
   const [isLoading, setIsLoading] = useState(true);
   
   // theme and navigation
   const [dark, setDark] = useState(false);
-  const [screen, setScreen] = useState('splash'); // splash -> onboarding -> main
+  const [screen, setScreen] = useState('splash');
   
   // user info from onboarding
   const [name, setName] = useState('');
@@ -274,7 +278,7 @@ export default function App() {
   const [onboardingStep, setOnboardingStep] = useState(0);
   
   // main screen state
-  const [period, setPeriod] = useState('today'); // today/week/month/year filter
+  const [period, setPeriod] = useState('today');
   const [showAdd, setShowAdd] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successAmount, setSuccessAmount] = useState('');
@@ -282,14 +286,14 @@ export default function App() {
   
   // settings modal state
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsPage, setSettingsPage] = useState('main'); // nested navigation in settings
+  const [settingsPage, setSettingsPage] = useState('main');
   const [editingName, setEditingName] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   
   // user preferences
   const [currency, setCurrency] = useState(CURRENCIES[0]);
   const [accentColor, setAccentColor] = useState(ACCENT_COLORS[0]);
-  const [useEUFormat, setUseEUFormat] = useState(false); // 1.234,56 vs 1,234.56
+  const [useEUFormat, setUseEUFormat] = useState(false);
   const [hideDecimals, setHideDecimals] = useState(false);
   
   // expense form state
@@ -298,7 +302,7 @@ export default function App() {
   const [note, setNote] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringFreq, setRecurringFreq] = useState('monthly');
-  const [expandedDates, setExpandedDates] = useState({}); // tracks which date groups are expanded
+  const [expandedDates, setExpandedDates] = useState({});
   const [expenseDate, setExpenseDate] = useState(getToday());
   const [showDatePicker, setShowDatePicker] = useState(false);
   
@@ -307,15 +311,28 @@ export default function App() {
   const [showOnboardingDatePicker, setShowOnboardingDatePicker] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   
-  // the actual expense data
+  // expense data
   const [expenses, setExpenses] = useState([]);
 
-  // animation ref for screen transitions
+  // Security / App Lock state
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockMethod, setLockMethod] = useState('none'); // 'none' | 'pin' | 'biometric' | 'both'
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [showSecuritySetup, setShowSecuritySetup] = useState(false); // Shows the setup prompt vs management view
+  const [pinSetupMode, setPinSetupMode] = useState('new'); // 'new' | 'change' | 'confirm'
+  const [pinSetupTarget, setPinSetupTarget] = useState('pin'); // 'pin' | 'both' - what method to enable after PIN setup
+  const [tempPin, setTempPin] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState('');
+
+  // animation refs
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  // prevent splash timer from firing twice in strict mode
   const splashTimerRef = useRef(false);
+  const appState = useRef(AppState.currentState);
   
-  // shorthand for current theme colors
+  // theme colors
   const t = dark ? themes.dark : themes.light;
   
   // override soul colors with user's accent preference
@@ -328,7 +345,6 @@ export default function App() {
 
   // ============================================
   // NUMBER FORMATTING
-  // handles EU format (1.234,56) and hiding decimals
   // ============================================
   
   const formatAmount = (amount, showSymbol = true) => {
@@ -347,7 +363,6 @@ export default function App() {
     return showSymbol ? `${currency.symbol}${formatted}` : formatted;
   };
 
-  // splits amount into whole and decimal parts for the big display
   const formatLargeAmount = (amount) => {
     const rounded = Math.round(amount);
     const fixed = amount.toFixed(2);
@@ -362,22 +377,262 @@ export default function App() {
   };
 
   // ============================================
+  // SECURITY FUNCTIONS
+  // ============================================
+
+  const checkBiometricAvailability = async () => {
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      setBiometricAvailable(compatible && enrolled);
+      
+      if (compatible) {
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+          setBiometricType('Face ID');
+        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+          setBiometricType('Touch ID');
+        }
+      }
+    } catch (error) {
+      console.log('Biometric check error:', error);
+    }
+  };
+
+  const loadSecuritySettings = async () => {
+    try {
+      const method = await SecureStore.getItemAsync(SECURE_KEYS.LOCK_METHOD);
+      const pin = await SecureStore.getItemAsync(SECURE_KEYS.PIN);
+      
+      // If no lock method is set, or it's explicitly 'none', don't lock
+      if (!method || method === 'none') {
+        setLockMethod('none');
+        setIsLocked(false);
+        return;
+      }
+      
+      // For PIN method, we MUST have a PIN stored
+      if (method === 'pin') {
+        if (pin && pin.length >= 4) {
+          setLockMethod(method);
+          setIsLocked(true);
+        } else {
+          // Invalid state - method requires PIN but no valid PIN exists
+          // Reset to 'none' so user isn't locked out
+          console.log('Invalid state: lock method requires PIN but none found. Resetting.');
+          await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+          await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
+          setLockMethod('none');
+          setIsLocked(false);
+        }
+        return;
+      }
+      
+      // Unknown method, reset to 'none'
+      await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+      setLockMethod('none');
+      setIsLocked(false);
+      
+    } catch (error) {
+      console.log('Error loading security settings:', error);
+      // On any error, fail open (don't lock user out)
+      setLockMethod('none');
+      setIsLocked(false);
+    }
+  };
+
+  const saveLockMethod = async (method) => {
+    try {
+      await SecureStore.setItemAsync(SECURE_KEYS.LOCK_METHOD, method);
+      setLockMethod(method);
+    } catch (error) {
+      console.log('Error saving lock method:', error);
+    }
+  };
+
+  const savePin = async (pin) => {
+    try {
+      await SecureStore.setItemAsync(SECURE_KEYS.PIN, pin);
+      return true;
+    } catch (error) {
+      console.log('Error saving PIN:', error);
+      return false;
+    }
+  };
+
+  const verifyPin = async (pin) => {
+    try {
+      const storedPin = await SecureStore.getItemAsync(SECURE_KEYS.PIN);
+      return storedPin === pin;
+    } catch (error) {
+      console.log('Error verifying PIN:', error);
+      return false;
+    }
+  };
+
+  const authenticateWithBiometrics = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock moola',
+        cancelLabel: 'Use PIN',
+        disableDeviceFallback: true,
+      });
+      return result.success;
+    } catch (error) {
+      console.log('Biometric auth error:', error);
+      return false;
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (lockMethod === 'biometric') {
+      const success = await authenticateWithBiometrics();
+      if (success) {
+        setIsLocked(false);
+      }
+    } else if (lockMethod === 'both') {
+      const success = await authenticateWithBiometrics();
+      if (success) {
+        setIsLocked(false);
+      }
+      // If biometric fails, user can still enter PIN
+    }
+    // For 'pin' method, user enters PIN directly
+  };
+
+  const handlePinSubmit = async () => {
+    if (pinInput.length < 4) {
+      setPinError('PIN must be at least 4 digits');
+      return;
+    }
+
+    if (pinSetupMode === 'new') {
+      setTempPin(pinInput);
+      setPinInput('');
+      setPinSetupMode('confirm');
+      setPinError('');
+    } else if (pinSetupMode === 'confirm') {
+      if (pinInput === tempPin) {
+        const saved = await savePin(pinInput);
+        if (saved) {
+          // Use pinSetupTarget to determine which method to enable
+          await saveLockMethod(pinSetupTarget);
+          setShowPinSetup(false);
+          setShowSecuritySetup(false);
+          setPinInput('');
+          setTempPin('');
+          setPinSetupMode('new');
+          setPinSetupTarget('pin');
+          setPinError('');
+        }
+      } else {
+        setPinError('PINs do not match');
+        setPinInput('');
+        setPinSetupMode('new');
+        setTempPin('');
+      }
+    } else if (pinSetupMode === 'change') {
+      const isValid = await verifyPin(pinInput);
+      if (isValid) {
+        setPinInput('');
+        setPinSetupMode('new');
+        setPinError('');
+      } else {
+        setPinError('Incorrect PIN');
+        setPinInput('');
+      }
+    }
+  };
+
+  const handleLockScreenPinSubmit = async () => {
+    const isValid = await verifyPin(pinInput);
+    if (isValid) {
+      setIsLocked(false);
+      setPinInput('');
+      setPinError('');
+    } else {
+      setPinError('Incorrect PIN');
+      setPinInput('');
+    }
+  };
+
+  const disableAppLock = async () => {
+    try {
+      await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
+      await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+      setLockMethod('none');
+      setIsLocked(false);
+      setShowSecuritySetup(false);
+      setSettingsPage('main');
+    } catch (error) {
+      console.log('Error disabling app lock:', error);
+    }
+  };
+
+  const enableLockMethod = async (method) => {
+    if (method === 'none') {
+      await disableAppLock();
+      return;
+    }
+
+    // Check if PIN exists
+    const existingPin = await SecureStore.getItemAsync(SECURE_KEYS.PIN);
+    
+    if (method === 'pin' || method === 'both') {
+      if (!existingPin) {
+        setPinSetupMode('new');
+        setShowPinSetup(true);
+      }
+      await saveLockMethod(method);
+    } else if (method === 'biometric') {
+      if (biometricAvailable) {
+        await saveLockMethod(method);
+      }
+    }
+  };
+
+  // ============================================
+  // APP STATE LISTENER (for auto-lock)
+  // ============================================
+
+  useEffect(() => {
+    checkBiometricAvailability();
+    
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (appState.current.match(/active/) && nextAppState.match(/inactive|background/)) {
+        // App going to background
+        if (lockMethod !== 'none') {
+          setIsLocked(true);
+        }
+      } else if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App coming to foreground
+        if (lockMethod !== 'none' && isLocked) {
+          handleUnlock();
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [lockMethod, isLocked]);
+
+  // ============================================
   // DATA PERSISTENCE
-  // load on mount, save on change
   // ============================================
 
   useEffect(() => {
     loadData();
+    loadSecuritySettings();
   }, []);
 
-  // save expenses whenever they change (but not on initial load)
   useEffect(() => {
     if (!isLoading && expenses.length >= 0) {
       saveExpenses();
     }
   }, [expenses]);
 
-  // save preferences when they change
   useEffect(() => {
     if (!isLoading && onboardingComplete) {
       savePreferences();
@@ -400,13 +655,11 @@ export default function App() {
         setStartDate(prefs.startDate || '');
         setOnboardingComplete(prefs.onboardingComplete || false);
         
-        // restore currency preference
         if (prefs.currency) {
           const savedCurrency = CURRENCIES.find(c => c.code === prefs.currency);
           if (savedCurrency) setCurrency(savedCurrency);
         }
         
-        // restore accent color preference
         if (prefs.accentColor) {
           const savedAccent = ACCENT_COLORS.find(a => a.id === prefs.accentColor);
           if (savedAccent) setAccentColor(savedAccent);
@@ -415,7 +668,6 @@ export default function App() {
         if (prefs.useEUFormat !== undefined) setUseEUFormat(prefs.useEUFormat);
         if (prefs.hideDecimals !== undefined) setHideDecimals(prefs.hideDecimals);
         
-        // skip to main if already onboarded
         if (prefs.onboardingComplete) setScreen('main');
       }
     } catch (error) {
@@ -460,7 +712,6 @@ export default function App() {
     transition('main');
   };
 
-  // fade out, change screen, fade in
   const transition = (next) => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
       if (typeof next === 'number') setOnboardingStep(next);
@@ -469,7 +720,6 @@ export default function App() {
     });
   };
 
-  // auto-advance from splash after 2.2 seconds
   useEffect(() => {
     if (screen === 'splash' && !isLoading && !splashTimerRef.current) {
       splashTimerRef.current = true;
@@ -481,7 +731,6 @@ export default function App() {
   // RECURRING EXPENSE HELPERS
   // ============================================
 
-  // returns human readable string like "in 3d" or "due today"
   const getDaysUntil = (dateStr) => {
     const today = getToday();
     const due = new Date(dateStr);
@@ -516,13 +765,11 @@ export default function App() {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const yearStart = new Date(today.getFullYear(), 0, 1);
 
-  // filter expenses by current period
   const todayExpenses = expenses.filter(e => e.date === todayStr);
   const weekExpenses = expenses.filter(e => e.date >= formatDate(weekAgo) && e.date <= todayStr);
   const monthExpenses = expenses.filter(e => e.date >= formatDate(monthStart) && e.date <= todayStr);
   const yearExpenses = expenses.filter(e => e.date >= formatDate(yearStart) && e.date <= todayStr);
 
-  // get filtered data based on selected period
   const getData = () => {
     if (period === 'today') return { items: todayExpenses, total: todayExpenses.reduce((s, e) => s + e.amount, 0) };
     if (period === 'week') return { items: weekExpenses, total: weekExpenses.reduce((s, e) => s + e.amount, 0) };
@@ -532,8 +779,6 @@ export default function App() {
 
   // ============================================
   // TIME PROGRESS CALCULATION
-  // used for the progress visualizations
-  // returns 0-1 representing how far through the period we are
   // ============================================
   
   const getTimeProgress = () => {
@@ -550,7 +795,6 @@ export default function App() {
       const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
       return (dayOfMonth - 1 + (now.getHours() + now.getMinutes() / 60) / 24) / daysInMonth;
     }
-    // year
     const startOfYear = new Date(now.getFullYear(), 0, 1);
     const dayOfYear = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24));
     const daysInYear = ((now.getFullYear() % 4 === 0 && now.getFullYear() % 100 !== 0) || now.getFullYear() % 400 === 0) ? 366 : 365;
@@ -562,7 +806,6 @@ export default function App() {
   const recurringTotal = items.filter(e => e.recurring).reduce((s, e) => s + e.amount, 0);
   const spendingTotal = items.filter(e => !e.recurring).reduce((s, e) => s + e.amount, 0);
 
-  // group expenses by date for non-today views
   const groupByDate = (list) => {
     const groups = {};
     list.forEach(item => {
@@ -570,7 +813,6 @@ export default function App() {
       groups[item.date].items.push(item);
       groups[item.date].total += item.amount;
     });
-    // sort newest first
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
   };
 
@@ -596,7 +838,7 @@ export default function App() {
     setNote(e.note);
     setIsRecurring(e.recurring);
     setRecurringFreq(e.freq || 'monthly');
-    setExpenseDate(new Date(e.date + 'T00:00:00')); // add time to avoid timezone issues
+    setExpenseDate(new Date(e.date + 'T00:00:00'));
     setShowAdd(true);
   };
 
@@ -611,14 +853,12 @@ export default function App() {
     const savedAmount = parseFloat(amount).toFixed(2);
     const dateStr = formatDate(expenseDate);
     
-    // calculate next due date for recurring expenses
     const nextDueDate = new Date(expenseDate);
     if (recurringFreq === 'weekly') nextDueDate.setDate(nextDueDate.getDate() + 7);
     else if (recurringFreq === 'monthly') nextDueDate.setMonth(nextDueDate.getMonth() + 1);
     else if (recurringFreq === 'yearly') nextDueDate.setFullYear(nextDueDate.getFullYear() + 1);
 
     if (editingExpense) {
-      // update existing
       setExpenses(expenses.map(e => e.id === editingExpense.id ? { 
         ...e, 
         amount: parseFloat(amount), 
@@ -631,7 +871,6 @@ export default function App() {
       setShowAdd(false);
       setEditingExpense(null);
     } else {
-      // create new
       setExpenses([{ 
         id: Date.now(), 
         amount: parseFloat(amount), 
@@ -642,7 +881,6 @@ export default function App() {
         nextDue: isRecurring ? formatDate(nextDueDate) : null 
       }, ...expenses]);
       
-      // show success animation then close
       setSuccessAmount(savedAmount);
       setShowSuccess(true);
       setTimeout(() => { 
@@ -668,14 +906,12 @@ export default function App() {
   const generateCSV = () => {
     const header = 'Date,Amount,Currency,Note,Recurring,Frequency\n';
     const rows = expenses.sort((a, b) => b.date.localeCompare(a.date)).map(e => {
-      // respect EU format in exports too
       const formattedAmount = useEUFormat ? e.amount.toFixed(2).replace('.', ',') : e.amount.toFixed(2);
       return `${e.date},${formattedAmount},${currency.code},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`;
     }).join('\n');
     return header + rows;
   };
 
-  // share via system share sheet
   const exportShare = async () => {
     try {
       const csv = generateCSV();
@@ -690,7 +926,6 @@ export default function App() {
     }
   };
 
-  // copy to clipboard
   const exportCopy = async () => {
     try {
       await Clipboard.setStringAsync(generateCSV());
@@ -700,7 +935,6 @@ export default function App() {
     }
   };
 
-  // save as file
   const exportSave = async () => {
     try {
       const csv = generateCSV();
@@ -721,7 +955,6 @@ export default function App() {
 
   // ============================================
   // SETTINGS SUB-PAGES
-  // breaking these out as separate components for readability
   // ============================================
 
   const SettingsMain = () => (
@@ -743,10 +976,28 @@ export default function App() {
         </View>
       </TouchableOpacity>
 
+      {/* Security Section */}
+      <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>SECURITY</Text>
+
+      <TouchableOpacity 
+        onPress={() => setSettingsPage('security')} 
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <LockIcon color={t.soul} />
+          <View>
+            <Text style={{ fontSize: 14, color: t.text }}>App Lock</Text>
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+              {lockMethod === 'none' ? 'Disabled' : 'PIN enabled'}
+            </Text>
+          </View>
+        </View>
+        <ChevronIcon color={t.sub} />
+      </TouchableOpacity>
+
       {/* Appearance Section */}
       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>APPEARANCE</Text>
       
-      {/* Dark Mode Toggle */}
       <TouchableOpacity 
         onPress={() => setDark(!dark)} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -760,7 +1011,6 @@ export default function App() {
         </View>
       </TouchableOpacity>
 
-      {/* Accent Color */}
       <TouchableOpacity 
         onPress={() => setSettingsPage('accent')} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -775,7 +1025,6 @@ export default function App() {
         </View>
       </TouchableOpacity>
 
-      {/* Currency */}
       <TouchableOpacity 
         onPress={() => setSettingsPage('currency')} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -793,7 +1042,6 @@ export default function App() {
       {/* Number Format Section */}
       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>NUMBER FORMAT</Text>
 
-      {/* EU Format Toggle */}
       <TouchableOpacity 
         onPress={() => setUseEUFormat(!useEUFormat)} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -810,7 +1058,6 @@ export default function App() {
         </View>
       </TouchableOpacity>
 
-      {/* Hide Decimals Toggle */}
       <TouchableOpacity 
         onPress={() => setHideDecimals(!hideDecimals)} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -830,7 +1077,6 @@ export default function App() {
       {/* Data Section */}
       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>DATA</Text>
 
-      {/* Export */}
       <TouchableOpacity 
         onPress={() => setShowExport(true)} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -845,7 +1091,6 @@ export default function App() {
         <ChevronIcon color={t.sub} />
       </TouchableOpacity>
 
-      {/* Clear Data - scary red */}
       <TouchableOpacity 
         onPress={() => setShowClearConfirm(true)} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
@@ -910,7 +1155,6 @@ export default function App() {
         moola is free and always will be.{'\n'}Your support helps keep it that way.
       </Text>
 
-      {/* Footer */}
       <View style={{ paddingVertical: 40, alignItems: 'center' }}>
         <SketchCircle size={40} color={t.muted} />
         <Text style={{ fontSize: 11, color: t.muted, marginTop: 12, fontStyle: 'italic' }}>v1.0.0</Text>
@@ -918,7 +1162,152 @@ export default function App() {
     </ScrollView>
   );
 
-  // Currency picker list
+  // Security Settings Page
+  const SettingsSecurity = () => {
+    const handleEnablePinOnly = () => {
+      // Close the settings modal first, then show PIN setup
+      setShowSettings(false);
+      // Use setTimeout to ensure settings modal is closed before opening PIN modal
+      setTimeout(() => {
+        setPinInput('');
+        setTempPin('');
+        setPinError('');
+        setPinSetupMode('new');
+        setPinSetupTarget('pin');
+        setShowPinSetup(true);
+      }, 100);
+    };
+
+    // Show setup prompt if no lock is configured or user wants to change method
+    if (showSecuritySetup || lockMethod === 'none') {
+      return (
+        <View style={{ flex: 1, padding: 24 }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ marginBottom: 32, alignItems: 'center' }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: t.soulDim, justifyContent: 'center', alignItems: 'center', marginBottom: 24 }}>
+                <LockIcon color={t.soul} />
+              </View>
+              <Text style={{ fontSize: 22, fontWeight: '400', color: t.text, textAlign: 'center', marginBottom: 12 }}>Protect Your Data</Text>
+              <Text style={{ fontSize: 13, color: t.sub, textAlign: 'center', lineHeight: 22, fontStyle: 'italic', maxWidth: 280 }}>
+                Add a layer of security to keep your financial records private.
+              </Text>
+            </View>
+
+            <View style={{ width: '100%', gap: 12 }}>
+              {/* PIN Option */}
+              <TouchableOpacity 
+                onPress={handleEnablePinOnly}
+                style={{ 
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                  padding: 16, backgroundColor: t.card, borderRadius: 8, 
+                  borderWidth: 1, borderColor: t.border 
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.soulDim, justifyContent: 'center', alignItems: 'center' }}>
+                    <LockIcon color={t.soul} />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 15, color: t.text, fontWeight: '500' }}>PIN Code</Text>
+                    <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>4-6 digit code</Text>
+                  </View>
+                </View>
+                <ChevronIcon color={t.sub} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Skip Option */}
+            <TouchableOpacity 
+              onPress={() => {
+                setShowSecuritySetup(false);
+                if (lockMethod === 'none') {
+                  setSettingsPage('main');
+                }
+              }}
+              style={{ marginTop: 32, padding: 12 }}
+            >
+              <Text style={{ fontSize: 13, color: t.sub, fontStyle: 'italic' }}>
+                {lockMethod === 'none' ? 'Maybe later' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Privacy Note */}
+          <View style={{ backgroundColor: t.soulDim, padding: 16, borderRadius: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <ShieldIcon color={t.soul} />
+              <Text style={{ fontSize: 12, color: t.text, fontWeight: '500' }}>Secure Storage</Text>
+            </View>
+            <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic' }}>
+              Your PIN is encrypted using {Platform.OS === 'ios' ? 'iOS Keychain' : 'Android Keystore'}. It never leaves your device.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Show management view if lock is already configured
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
+        {/* Current Status */}
+        <View style={{ backgroundColor: t.soulDim, padding: 20, borderRadius: 8, marginBottom: 24, alignItems: 'center' }}>
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: t.soul, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+            <LockIcon color="#fff" />
+          </View>
+          <Text style={{ fontSize: 16, color: t.text, fontWeight: '500', marginBottom: 4 }}>App Lock Enabled</Text>
+          <Text style={{ fontSize: 12, color: t.sub, fontStyle: 'italic' }}>PIN Code</Text>
+        </View>
+
+        {/* Options */}
+        <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16 }}>OPTIONS</Text>
+
+        {/* Change PIN */}
+        <TouchableOpacity 
+          onPress={() => { 
+            setShowSettings(false);
+            setTimeout(() => {
+              setPinInput('');
+              setTempPin('');
+              setPinError('');
+              setPinSetupMode('change'); 
+              setShowPinSetup(true); 
+            }, 100);
+          }} 
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <Text style={{ fontSize: 16, color: t.soul }}>••••</Text>
+            <Text style={{ fontSize: 14, color: t.text }}>Change PIN</Text>
+          </View>
+          <ChevronIcon color={t.sub} />
+        </TouchableOpacity>
+
+        {/* Disable Lock */}
+        <TouchableOpacity 
+          onPress={disableAppLock} 
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <TrashIcon color={dark ? '#c08080' : '#906060'} />
+            <Text style={{ fontSize: 14, color: dark ? '#c08080' : '#906060' }}>Disable App Lock</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Privacy Note */}
+        <View style={{ backgroundColor: t.soulDim, padding: 16, borderRadius: 4, marginTop: 32 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <ShieldIcon color={t.soul} />
+            <Text style={{ fontSize: 12, color: t.text, fontWeight: '500' }}>Your PIN is secure</Text>
+          </View>
+          <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic' }}>
+            Your PIN is encrypted and stored securely on your device using {Platform.OS === 'ios' ? 'iOS Keychain' : 'Android Keystore'}. It never leaves your device and cannot be recovered if forgotten.
+          </Text>
+        </View>
+
+      </ScrollView>
+    );
+  };
+
   const SettingsCurrency = () => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
       <Text style={{ fontSize: 13, color: t.sub, marginBottom: 24, fontStyle: 'italic' }}>
@@ -952,7 +1341,6 @@ export default function App() {
     </ScrollView>
   );
 
-  // Name editor
   const SettingsName = () => (
     <View style={{ flex: 1, padding: 24 }}>
       <Text style={{ fontSize: 13, color: t.sub, marginBottom: 24, fontStyle: 'italic' }}>
@@ -987,7 +1375,6 @@ export default function App() {
     </View>
   );
 
-  // Accent color picker with preview
   const SettingsAccent = () => (
     <View style={{ flex: 1, padding: 24 }}>
       <Text style={{ fontSize: 13, color: t.sub, marginBottom: 32, fontStyle: 'italic' }}>
@@ -1021,7 +1408,6 @@ export default function App() {
         );
       })}
       
-      {/* live preview of the selected color */}
       <View style={{ marginTop: 32, padding: 20, backgroundColor: dark ? accentColor.darkDim : accentColor.dim, borderRadius: 4 }}>
         <Text style={{ fontSize: 11, color: t.sub, marginBottom: 8, letterSpacing: 1 }}>PREVIEW</Text>
         <Text style={{ fontSize: 28, fontWeight: '300', color: t.text }}>
@@ -1039,7 +1425,6 @@ export default function App() {
     </View>
   );
 
-  // Privacy policy 
   const SettingsPrivacy = () => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
       <View style={{ alignItems: 'center', marginBottom: 32 }}>
@@ -1116,7 +1501,7 @@ export default function App() {
             'Uninstalling the app removes all data'
           ].map((text, i) => (
             <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-              <Text style={{ color: t.soul, fontSize: 12 }}>✔</Text>
+              <Text style={{ color: t.soul, fontSize: 12 }}>✓</Text>
               <Text style={{ fontSize: 13, color: t.sub, flex: 1 }}>{text}</Text>
             </View>
           ))}
@@ -1149,7 +1534,6 @@ export default function App() {
     </ScrollView>
   );
 
-  // About page - credits and stuff
   const SettingsAbout = () => (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, alignItems: 'center' }}>
       <View style={{ marginVertical: 32, alignItems: 'center' }}>
@@ -1195,6 +1579,155 @@ export default function App() {
   );
 
   // ============================================
+  // LOCK SCREEN COMPONENT
+  // ============================================
+
+  const LockScreen = () => {
+    // Safety check: verify PIN actually exists on mount
+    // If no PIN is stored but we're on lock screen, unlock immediately
+    useEffect(() => {
+      const verifyPinExists = async () => {
+        try {
+          const storedPin = await SecureStore.getItemAsync(SECURE_KEYS.PIN);
+          // If lock method requires PIN but no PIN exists, unlock
+          if (lockMethod === 'pin' && (!storedPin || storedPin.length < 4)) {
+            console.log('No valid PIN found, unlocking app');
+            await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+            await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
+            setLockMethod('none');
+            setIsLocked(false);
+          }
+        } catch (error) {
+          console.log('Error verifying PIN:', error);
+          // Fail open - don't lock user out
+          setIsLocked(false);
+        }
+      };
+      verifyPinExists();
+    }, []);
+
+    const handleKeyPress = (key) => {
+      if (key === 'delete') {
+        setPinInput(prev => prev.slice(0, -1));
+        setPinError('');
+      } else if (pinInput.length < 6) {
+        setPinInput(prev => prev + key);
+        setPinError('');
+      }
+    };
+
+    const NumKey = ({ value, onPress }) => (
+      <TouchableOpacity 
+        onPress={() => onPress(value)}
+        style={{ 
+          width: 72, height: 72, borderRadius: 36, 
+          backgroundColor: t.card, borderWidth: 1, borderColor: t.border,
+          justifyContent: 'center', alignItems: 'center', margin: 8 
+        }}
+      >
+        {value === 'delete' ? (
+          <Svg width={24} height={24} viewBox="0 0 24 24">
+            <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6" stroke={t.sub} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        ) : (
+          <Text style={{ fontSize: 28, color: t.text, fontWeight: '300' }}>{value}</Text>
+        )}
+      </TouchableOpacity>
+    );
+
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+          
+          <View style={{ marginBottom: 40, alignItems: 'center' }}>
+            <SketchCircle size={60} color={t.soul} />
+            <Text style={{ fontSize: 20, fontWeight: '300', color: t.text, marginTop: 16, letterSpacing: 4 }}>moola</Text>
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 4, fontStyle: 'italic' }}>enter PIN to unlock</Text>
+          </View>
+
+          {/* PIN Dots */}
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+            {[0, 1, 2, 3, 4, 5].map(i => (
+              <View 
+                key={i} 
+                style={{ 
+                  width: 14, height: 14, borderRadius: 7, 
+                  backgroundColor: i < pinInput.length ? t.soul : 'transparent',
+                  borderWidth: 1.5, borderColor: i < pinInput.length ? t.soul : t.border
+                }} 
+              />
+            ))}
+          </View>
+
+          {pinError ? (
+            <Text style={{ fontSize: 12, color: dark ? '#c08080' : '#906060', marginBottom: 16 }}>{pinError}</Text>
+          ) : (
+            <View style={{ height: 28 }} />
+          )}
+
+          {/* Numeric Keypad */}
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row' }}>
+              <NumKey value="1" onPress={handleKeyPress} />
+              <NumKey value="2" onPress={handleKeyPress} />
+              <NumKey value="3" onPress={handleKeyPress} />
+            </View>
+            <View style={{ flexDirection: 'row' }}>
+              <NumKey value="4" onPress={handleKeyPress} />
+              <NumKey value="5" onPress={handleKeyPress} />
+              <NumKey value="6" onPress={handleKeyPress} />
+            </View>
+            <View style={{ flexDirection: 'row' }}>
+              <NumKey value="7" onPress={handleKeyPress} />
+              <NumKey value="8" onPress={handleKeyPress} />
+              <NumKey value="9" onPress={handleKeyPress} />
+            </View>
+            <View style={{ flexDirection: 'row' }}>
+              <View style={{ width: 72, height: 72, margin: 8 }} />
+              <NumKey value="0" onPress={handleKeyPress} />
+              <NumKey value="delete" onPress={handleKeyPress} />
+            </View>
+          </View>
+
+          {/* Unlock Button */}
+          <TouchableOpacity 
+            onPress={handleLockScreenPinSubmit}
+            disabled={pinInput.length < 4}
+            style={{ 
+              marginTop: 24, paddingVertical: 14, paddingHorizontal: 48,
+              backgroundColor: pinInput.length >= 4 ? t.soul : t.muted, 
+              borderRadius: 2 
+            }}
+          >
+            <Text style={{ color: pinInput.length >= 4 ? '#fff' : t.sub, fontSize: 12, letterSpacing: 2 }}>UNLOCK</Text>
+          </TouchableOpacity>
+
+          {/* Emergency Reset - Remove this after you get in */}
+          <TouchableOpacity 
+            onPress={async () => {
+              try {
+                await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
+                await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+                setLockMethod('none');
+                setIsLocked(false);
+                setPinInput('');
+              } catch (e) {
+                console.log('Reset error:', e);
+              }
+            }}
+            style={{ marginTop: 40, padding: 12 }}
+          >
+            <Text style={{ fontSize: 12, color: t.sub, textDecorationLine: 'underline' }}>
+              Reset Lock (Emergency)
+            </Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
+  };
+
+  // ============================================
   // RENDER: LOADING STATE
   // ============================================
 
@@ -1205,6 +1738,14 @@ export default function App() {
         <SketchCircle size={60} color={dark ? themes.dark.soul : themes.light.ink} />
       </View>
     );
+  }
+
+  // ============================================
+  // RENDER: LOCK SCREEN
+  // ============================================
+
+  if (isLocked && screen === 'main') {
+    return <LockScreen />;
   }
 
   // ============================================
@@ -1227,12 +1768,10 @@ export default function App() {
 
   // ============================================
   // RENDER: ONBOARDING FLOW
-  // 4 steps: name -> greeting -> date -> privacy
   // ============================================
 
   if (screen === 'onboarding') {
     const renderStep = () => {
-      // Step 0: Name input
       if (onboardingStep === 0) {
         return (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
@@ -1249,7 +1788,6 @@ export default function App() {
         );
       }
       
-      // Step 1: Greeting
       if (onboardingStep === 1) {
         return (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
@@ -1268,7 +1806,6 @@ export default function App() {
         );
       }
       
-      // Step 2: Start date picker
       if (onboardingStep === 2) {
         return (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
@@ -1299,7 +1836,6 @@ export default function App() {
         );
       }
       
-      // Step 3: Privacy info and enter app
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
           <View style={{ flexDirection: 'row', gap: 16, marginBottom: 40 }}>
@@ -1323,7 +1859,6 @@ export default function App() {
       <Animated.View style={{ flex: 1, backgroundColor: t.bg, opacity: fadeAnim }}>
         <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
         <SafeAreaView style={{ flex: 1 }}>{renderStep()}</SafeAreaView>
-        {/* Step indicator dots */}
         <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
           {[0, 1, 2, 3].map(i => (
             <Svg key={i} width={12} height={12} viewBox="0 0 12 12">
@@ -1344,14 +1879,12 @@ export default function App() {
       <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }}>
-          {/* Header with total and action buttons */}
+          {/* Header */}
           <View style={{ padding: 24, paddingTop: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View>
-              {/* Dynamic header text based on period */}
               <Text style={{ fontSize: 10, color: t.sub, letterSpacing: 2, fontStyle: 'italic' }}>
                 {period === 'today' ? formatHeaderDate(getToday()) : period === 'week' ? 'This Week' : period === 'month' ? `${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][getToday().getMonth()]} ${getToday().getFullYear()}` : `Year ${getToday().getFullYear()}`}
               </Text>
-              {/* Big total display - splits whole and decimal parts */}
               <Text style={{ fontSize: 42, fontWeight: '300', marginTop: 8, color: t.text, letterSpacing: -1 }}>
                 {currency.symbol}{formatLargeAmount(total).whole}{!hideDecimals && <Text style={{ fontSize: 20, color: t.sub, fontWeight: '300' }}>{formatLargeAmount(total).separator}{formatLargeAmount(total).decimal}</Text>}
               </Text>
@@ -1366,21 +1899,13 @@ export default function App() {
             </View>
           </View>
 
-          {/* ============================================
-              TIME PROGRESS VISUALIZATIONS
-              each period has a different style
-              ============================================ */}
+          {/* Time Progress Visualizations */}
           <View style={{ paddingHorizontal: 24, paddingBottom: 20 }}>
-            
-            {/* TODAY: Flowing wave with dot indicator */}
             {period === 'today' && (
               <View>
                 <Svg width="100%" height={24} viewBox="0 0 300 24" preserveAspectRatio="none">
-                  {/* Background wave */}
                   <Path d="M0,12 Q75,8 150,12 T300,12" stroke={t.muted} strokeWidth={2} fill="none" />
-                  {/* Progress wave - uses bezier math to animate along the path */}
                   <Path d={`M0,12 Q${37.5 * Math.min(timeProgress * 4, 1)},${8 + (1 - Math.min(timeProgress * 4, 1)) * 4} ${75 * Math.min(timeProgress * 2, 1)},12 ${timeProgress > 0.5 ? `T${150 * Math.min(timeProgress * 1.33, 1)},12` : ''} ${timeProgress > 0.75 ? `T${timeProgress * 300},12` : ''}`} stroke={t.soul} strokeWidth={3} fill="none" strokeLinecap="round" />
-                  {/* Position indicator dot */}
                   <Circle cx={Math.max(8, timeProgress * 292)} cy={12} r={5} fill={t.soul} opacity={0.9} />
                   <Circle cx={Math.max(8, timeProgress * 292)} cy={12} r={8} fill={t.soul} opacity={0.2} />
                 </Svg>
@@ -1391,12 +1916,10 @@ export default function App() {
               </View>
             )}
 
-            {/* WEEK: 7 vertical bars for each day */}
             {period === 'week' && (
               <View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 32, marginBottom: 6 }}>
                   {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => {
-                    // calculate how filled each day bar should be
                     const dayProgress = i < Math.floor(timeProgress * 7) ? 1 : i === Math.floor(timeProgress * 7) ? (timeProgress * 7) % 1 : 0;
                     return (
                       <View key={i} style={{ flex: 1, alignItems: 'center', marginHorizontal: 2 }}>
@@ -1419,14 +1942,11 @@ export default function App() {
               </View>
             )}
 
-            {/* MONTH: Cool spiral visualization */}
             {period === 'month' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                 <Svg width={64} height={64} viewBox="0 0 64 64">
-                  {/* Background spiral */}
                   <Path d="M32,8 A24,24 0 0,1 56,32 A20,20 0 0,1 36,52 A16,16 0 0,1 20,36 A12,12 0 0,1 32,24 A8,8 0 0,1 40,32" 
                     stroke={t.muted} strokeWidth={3} fill="none" strokeLinecap="round" />
-                  {/* Progress spiral - dasharray creates the partial fill effect */}
                   <Path d="M32,8 A24,24 0 0,1 56,32 A20,20 0 0,1 36,52 A16,16 0 0,1 20,36 A12,12 0 0,1 32,24 A8,8 0 0,1 40,32" 
                     stroke={t.soul} strokeWidth={3} fill="none" strokeLinecap="round"
                     strokeDasharray={`${timeProgress * 126} 126`} />
@@ -1442,7 +1962,6 @@ export default function App() {
               </View>
             )}
 
-            {/* YEAR: 12 mini month boxes */}
             {period === 'year' && (
               <View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -1475,7 +1994,7 @@ export default function App() {
             )}
           </View>
 
-          {/* Period selector tabs */}
+          {/* Period selector */}
           <View style={{ paddingHorizontal: 24, paddingBottom: 24, flexDirection: 'row', gap: 10 }}>
             {['today', 'week', 'month', 'year'].map(p => (
               <TouchableOpacity key={p} onPress={() => setPeriod(p)} style={{ paddingVertical: 9, paddingHorizontal: 14, borderWidth: period === p ? 1.5 : 1, borderColor: period === p ? t.soul : t.border, borderRadius: 2 }}>
@@ -1489,7 +2008,6 @@ export default function App() {
           {/* Expense list */}
           <View style={{ padding: 24, paddingTop: 16 }}>
             {period === 'today' ? (
-              // Today view: flat list
               items.length > 0 ? items.map(e => (
                 <TouchableOpacity key={e.id} onPress={() => openEdit(e)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}>
                   <View>
@@ -1502,7 +2020,6 @@ export default function App() {
                   <Text style={{ fontSize: 15, color: t.text }}>{formatAmount(e.amount)}</Text>
                 </TouchableOpacity>
               )) : (
-                // empty state
                 <View style={{ paddingVertical: 48, alignItems: 'center' }}>
                   <Svg width={40} height={40} viewBox="0 0 40 40" style={{ marginBottom: 16, opacity: 0.3 }}>
                     <Circle cx={20} cy={20} r={15} stroke={t.sub} strokeWidth={1} fill="none" strokeDasharray="3 3" />
@@ -1511,7 +2028,6 @@ export default function App() {
                 </View>
               )
             ) : (
-              // Other periods: grouped by date with expand/collapse
               groupByDate(items).map(([date, group]) => (
                 <View key={date}>
                   <TouchableOpacity onPress={() => toggleDate(date)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border }}>
@@ -1523,7 +2039,6 @@ export default function App() {
                     </View>
                     <Text style={{ fontSize: 12, color: t.sub, fontStyle: 'italic' }}>{formatAmount(group.total)}</Text>
                   </TouchableOpacity>
-                  {/* Expanded items with dashed border */}
                   {expandedDates[date] && group.items.map(e => (
                     <TouchableOpacity key={e.id} onPress={() => openEdit(e)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingLeft: 20, borderBottomWidth: 1, borderBottomColor: t.border, borderStyle: 'dashed', backgroundColor: t.card }}>
                       <View>
@@ -1541,29 +2056,28 @@ export default function App() {
             )}
           </View>
 
-          {/* Footer branding */}
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
             <Text style={{ fontSize: 16, color: t.muted, letterSpacing: 4, fontWeight: '300' }}>moola</Text>
           </View>
         </ScrollView>
 
-        {/* Floating add button - hidden when modals are open */}
+        {/* FAB */}
         {!showAdd && !showExport && !showSettings && (
           <TouchableOpacity onPress={openAdd} style={{ position: 'absolute', bottom: 40, right: 24, width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: t.border, justifyContent: 'center', alignItems: 'center', backgroundColor: t.bg }}>
             <Text style={{ color: t.soul, fontSize: 22 }}>+</Text>
           </TouchableOpacity>
         )}
 
-        {/* ============================================
-            SETTINGS MODAL
-            ============================================ */}
+        {/* Settings Modal */}
         <Modal visible={showSettings} animationType="slide">
           <View style={{ flex: 1, backgroundColor: t.bg }}>
             <SafeAreaView style={{ flex: 1 }}>
-              {/* Header with back button for sub-pages */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: t.border }}>
                 {settingsPage !== 'main' ? (
-                  <TouchableOpacity onPress={() => setSettingsPage('main')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TouchableOpacity onPress={() => {
+                    setShowSecuritySetup(false);
+                    setSettingsPage('main');
+                  }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Svg width={16} height={16} viewBox="0 0 16 16">
                       <Path d="M10 3L5 8L10 13" stroke={t.sub} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
@@ -1573,27 +2087,141 @@ export default function App() {
                   <View />
                 )}
                 <Text style={{ fontSize: 15, color: t.text, fontWeight: '500', letterSpacing: 1 }}>
-                  {settingsPage === 'main' ? 'Settings' : settingsPage === 'currency' ? 'Currency' : settingsPage === 'accent' ? 'Accent Color' : settingsPage === 'name' ? 'Name' : settingsPage === 'privacy' ? 'Privacy Policy' : 'About'}
+                  {settingsPage === 'main' ? 'Settings' : settingsPage === 'currency' ? 'Currency' : settingsPage === 'accent' ? 'Accent Color' : settingsPage === 'name' ? 'Name' : settingsPage === 'privacy' ? 'Privacy Policy' : settingsPage === 'security' ? 'App Lock' : 'About'}
                 </Text>
-                <TouchableOpacity onPress={() => setShowSettings(false)}>
+                <TouchableOpacity onPress={() => {
+                  setShowSecuritySetup(false);
+                  setShowSettings(false);
+                }}>
                   <Text style={{ fontSize: 20, color: t.sub }}>×</Text>
                 </TouchableOpacity>
               </View>
               
-              {/* Render the active settings page */}
               {settingsPage === 'main' && <SettingsMain />}
               {settingsPage === 'currency' && <SettingsCurrency />}
               {settingsPage === 'accent' && <SettingsAccent />}
               {settingsPage === 'name' && <SettingsName />}
               {settingsPage === 'privacy' && <SettingsPrivacy />}
               {settingsPage === 'about' && <SettingsAbout />}
+              {settingsPage === 'security' && <SettingsSecurity />}
             </SafeAreaView>
           </View>
         </Modal>
 
-        {/* ============================================
-            CLEAR DATA CONFIRMATION MODAL
-            ============================================ */}
+        {/* PIN Setup Modal */}
+        <Modal visible={showPinSetup} animationType="fade">
+          <View style={{ flex: 1, backgroundColor: t.bg }}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                <View />
+                <Text style={{ fontSize: 15, color: t.text, fontWeight: '500', letterSpacing: 1 }}>
+                  {pinSetupMode === 'change' ? 'Enter Current PIN' : pinSetupMode === 'confirm' ? 'Confirm PIN' : 'Create PIN'}
+                </Text>
+                <TouchableOpacity onPress={() => { 
+                  setShowPinSetup(false);
+                  setShowSecuritySetup(false);
+                  setPinInput(''); 
+                  setTempPin(''); 
+                  setPinSetupMode('new');
+                  setPinSetupTarget('pin'); 
+                  setPinError(''); 
+                }}>
+                  <Text style={{ fontSize: 20, color: t.sub }}>×</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                <Text style={{ fontSize: 13, color: t.sub, marginBottom: 32, textAlign: 'center', fontStyle: 'italic' }}>
+                  {pinSetupMode === 'change' ? 'Enter your current PIN to continue' : pinSetupMode === 'confirm' ? 'Re-enter your PIN to confirm' : 'Enter a 4-6 digit PIN'}
+                </Text>
+
+                {/* PIN Dots */}
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
+                  {[0, 1, 2, 3, 4, 5].map(i => (
+                    <View 
+                      key={i} 
+                      style={{ 
+                        width: 14, height: 14, borderRadius: 7, 
+                        backgroundColor: i < pinInput.length ? t.soul : 'transparent',
+                        borderWidth: 1.5, borderColor: i < pinInput.length ? t.soul : t.border
+                      }} 
+                    />
+                  ))}
+                </View>
+
+                {pinError ? (
+                  <Text style={{ fontSize: 12, color: dark ? '#c08080' : '#906060', marginBottom: 16 }}>{pinError}</Text>
+                ) : (
+                  <View style={{ height: 28 }} />
+                )}
+
+                {/* Numeric Keypad */}
+                <View style={{ alignItems: 'center' }}>
+                  {[[1, 2, 3], [4, 5, 6], [7, 8, 9], ['', 0, 'del']].map((row, rowIndex) => (
+                    <View key={rowIndex} style={{ flexDirection: 'row' }}>
+                      {row.map((key, keyIndex) => (
+                        <TouchableOpacity 
+                          key={keyIndex}
+                          onPress={() => {
+                            if (key === 'del') {
+                              setPinInput(prev => prev.slice(0, -1));
+                              setPinError('');
+                            } else if (key !== '' && pinInput.length < 6) {
+                              setPinInput(prev => prev + key);
+                              setPinError('');
+                            }
+                          }}
+                          disabled={key === ''}
+                          style={{ 
+                            width: 72, height: 72, borderRadius: 36, 
+                            backgroundColor: key === '' ? 'transparent' : t.card, 
+                            borderWidth: key === '' ? 0 : 1, borderColor: t.border,
+                            justifyContent: 'center', alignItems: 'center', margin: 8 
+                          }}
+                        >
+                          {key === 'del' ? (
+                            <Svg width={24} height={24} viewBox="0 0 24 24">
+                              <Path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2zM18 9l-6 6M12 9l6 6" stroke={t.sub} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            </Svg>
+                          ) : key !== '' ? (
+                            <Text style={{ fontSize: 28, color: t.text, fontWeight: '300' }}>{key}</Text>
+                          ) : null}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity 
+                  onPress={handlePinSubmit}
+                  disabled={pinInput.length < 4}
+                  style={{ 
+                    marginTop: 24, paddingVertical: 14, paddingHorizontal: 48,
+                    backgroundColor: pinInput.length >= 4 ? t.soul : t.muted, 
+                    borderRadius: 2 
+                  }}
+                >
+                  <Text style={{ color: pinInput.length >= 4 ? '#fff' : t.sub, fontSize: 12, letterSpacing: 2 }}>
+                    {pinSetupMode === 'confirm' ? 'CONFIRM' : 'NEXT'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Privacy Note */}
+              <View style={{ padding: 24 }}>
+                <View style={{ backgroundColor: t.soulDim, padding: 16, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic', textAlign: 'center' }}>
+                    Your PIN is encrypted and stored securely on your device.
+                  </Text>
+                </View>
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
+
+        {/* Clear Data Confirmation Modal */}
         <Modal visible={showClearConfirm} transparent animationType="fade">
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
             <View style={{ backgroundColor: t.card, borderRadius: 8, width: '100%', maxWidth: 300, padding: 24, borderWidth: 1, borderColor: t.border }}>
@@ -1622,30 +2250,24 @@ export default function App() {
           </View>
         </Modal>
 
-        {/* ============================================
-            EXPORT MODAL (bottom sheet style)
-            ============================================ */}
+        {/* Export Modal */}
         <Modal visible={showExport} transparent animationType="slide">
           <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowExport(false)}>
             <View style={{ backgroundColor: t.card, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 24, borderWidth: 1, borderColor: t.border, borderBottomWidth: 0 }}>
-              {/* Drag handle */}
               <View style={{ width: 40, height: 4, backgroundColor: t.muted, borderRadius: 2, alignSelf: 'center', marginBottom: 24 }} />
               <Text style={{ fontSize: 15, color: t.text, marginBottom: 8, fontStyle: 'italic' }}>Export your records</Text>
               <Text style={{ fontSize: 11, color: t.sub, marginBottom: 20 }}>{expenses.length} expenses</Text>
               
-              {/* Share option */}
               <TouchableOpacity onPress={exportShare} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
                 <ShareIcon color={t.soul} />
                 <View style={{ flex: 1 }}><Text style={{ fontSize: 14, color: t.text }}>Share</Text><Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Send via email, message, airdrop</Text></View>
               </TouchableOpacity>
               
-              {/* Copy option */}
               <TouchableOpacity onPress={exportCopy} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
                 <CopyIcon color={t.soul} />
                 <View style={{ flex: 1 }}><Text style={{ fontSize: 14, color: t.text }}>Copy to Clipboard</Text><Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Paste into any app</Text></View>
               </TouchableOpacity>
               
-              {/* Save option */}
               <TouchableOpacity onPress={exportSave} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.border }}>
                 <SaveIcon color={t.soul} />
                 <View style={{ flex: 1 }}><Text style={{ fontSize: 14, color: t.text }}>Save as CSV</Text><Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Excel, Sheets, Numbers</Text></View>
@@ -1658,14 +2280,11 @@ export default function App() {
           </TouchableOpacity>
         </Modal>
 
-        {/* ============================================
-            ADD/EDIT EXPENSE MODAL
-            ============================================ */}
+        {/* Add/Edit Expense Modal */}
         <Modal visible={showAdd} animationType="fade">
           <View style={{ flex: 1, backgroundColor: t.bg }}>
             <SafeAreaView style={{ flex: 1 }}>
               {showSuccess ? (
-                // Success animation after adding
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 }}>
                   <Svg width={64} height={64} viewBox="0 0 64 64" style={{ marginBottom: 24 }}>
                     <Circle cx={32} cy={32} r={28} stroke={t.soul} strokeWidth={2} fill="none" />
@@ -1675,9 +2294,7 @@ export default function App() {
                   <Text style={{ fontSize: 13, color: t.sub, marginTop: 8, fontStyle: 'italic' }}>added to your records</Text>
                 </View>
               ) : (
-                // The actual form
                 <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 28, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-                  {/* Header */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 }}>
                     <Text style={{ fontSize: 13, color: t.text, letterSpacing: 2, fontStyle: 'italic' }}>{editingExpense ? 'edit record' : 'new record'}</Text>
                     <TouchableOpacity onPress={() => { setShowAdd(false); setEditingExpense(null); setShowDatePicker(false); }}>
@@ -1685,24 +2302,20 @@ export default function App() {
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Amount input */}
                   <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 8 }}>AMOUNT</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 32 }}>
                     <Text style={{ fontSize: 32, color: t.sub }}>{currency.symbol}</Text>
                     <TextInput value={amount} onChangeText={setAmount} placeholder="0.00" placeholderTextColor={t.muted} keyboardType="decimal-pad" autoFocus style={{ fontSize: 44, fontWeight: '300', color: t.text, flex: 1 }} />
                   </View>
                   
-                  {/* Note input */}
                   <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 8 }}>NOTE <Text style={{ fontStyle: 'italic' }}>(optional)</Text></Text>
                   <TextInput value={note} onChangeText={setNote} placeholder="what was this for?" placeholderTextColor={t.muted} style={{ fontSize: 15, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border, color: t.text, fontStyle: 'italic', marginBottom: 24 }} />
                   
-                  {/* Date picker trigger */}
                   <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 8 }}>DATE</Text>
                   <TouchableOpacity onPress={() => setShowDatePicker(true)} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border, marginBottom: 24 }}>
                     <Text style={{ fontSize: 15, color: t.text }}>{formatDate(expenseDate) === todayStr ? 'Today' : formatDisplayDate(expenseDate)}</Text>
                   </TouchableOpacity>
                   
-                  {/* Recurring toggle */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18, borderTopWidth: 1, borderTopColor: t.border }}>
                     <View><Text style={{ fontSize: 14, color: t.text }}>Recurring</Text><Text style={{ fontSize: 10, color: t.sub, marginTop: 4, fontStyle: 'italic' }}>repeats automatically</Text></View>
                     <TouchableOpacity onPress={() => setIsRecurring(!isRecurring)} style={{ width: 44, height: 24, borderRadius: 12, borderWidth: 1, borderColor: isRecurring ? t.soul : t.border, backgroundColor: isRecurring ? t.soulDim : 'transparent', justifyContent: 'center', paddingHorizontal: 2 }}>
@@ -1710,7 +2323,6 @@ export default function App() {
                     </TouchableOpacity>
                   </View>
                   
-                  {/* Frequency options (only shown if recurring) */}
                   {isRecurring && (
                     <View style={{ paddingVertical: 18, borderTopWidth: 1, borderTopColor: t.border }}>
                       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 12 }}>FREQUENCY</Text>
@@ -1724,7 +2336,6 @@ export default function App() {
                     </View>
                   )}
                   
-                  {/* Action buttons */}
                   <View style={{ paddingTop: 24, flexDirection: 'row', gap: 12 }}>
                     {editingExpense && (
                       <TouchableOpacity onPress={deleteExpense} style={{ paddingVertical: 12, paddingHorizontal: 18, borderWidth: 1, borderColor: dark ? '#6b4040' : '#c49090', borderRadius: 2 }}>
@@ -1739,7 +2350,6 @@ export default function App() {
               )}
             </SafeAreaView>
             
-            {/* Date picker modal (nested inside add modal) */}
             <Modal visible={showDatePicker} transparent animationType="fade">
               <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
                 <View style={{ backgroundColor: t.card, borderRadius: 12, width: '100%', maxWidth: 320, borderWidth: 1, borderColor: t.border }}>
