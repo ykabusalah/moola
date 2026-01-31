@@ -1,0 +1,10 @@
+export { SettingsModal } from './SettingsModal';
+export { SettingsMain } from './SettingsMain';
+export { SettingsSecurity } from './SettingsSecurity';
+export { SettingsReminders } from './SettingsReminders';
+export { SettingsBackup } from './SettingsBackup';
+export { SettingsCurrency } from './SettingsCurrency';
+export { SettingsAccent } from './SettingsAccent';
+export { SettingsName } from './SettingsName';
+export { SettingsPrivacy } from './SettingsPrivacy';
+export { SettingsAbout } from './SettingsAbout';
