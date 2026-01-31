@@ -22,6 +22,7 @@ import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as Notifications from 'expo-notifications';
 
 // ============================================
 // STORAGE KEYS
@@ -29,6 +30,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 const STORAGE_KEYS = {
   EXPENSES: '@moola/expenses',
   PREFERENCES: '@moola/preferences',
+  LAST_EXPORT: '@moola/last_export',
 };
 
 const SECURE_KEYS = {
@@ -43,6 +45,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // ============================================
 
 const SUPPORT_LINK = 'https://ko-fi.com/ykabusalah';
+const FEEDBACK_LINK = 'https://tally.so/r/lbrOXp';
 
 const ACCENT_COLORS = [
   { id: 'sage', name: 'Sage', color: '#5a7c4a', dim: '#e8f0e4', darkColor: '#6b9b54', darkDim: '#1a2e14' },
@@ -261,6 +264,32 @@ const FaceIdIcon = ({ color }) => (
   </Svg>
 );
 
+const BellIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M13.73 21a2 2 0 01-3.46 0" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const CloudIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const MessageIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const ClockIcon = ({ color }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24">
+    <Circle cx={12} cy={12} r={10} stroke={color} strokeWidth="1.5" fill="none" />
+    <Path d="M12 6v6l4 2" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // ============================================
 // MAIN APP COMPONENT
 // ============================================
@@ -327,6 +356,16 @@ export default function App() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('');
 
+  // Daily reminder state
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
+  const [dailyReminderTime, setDailyReminderTime] = useState(new Date(new Date().setHours(20, 0, 0, 0))); // Default 8 PM
+  const [showReminderTimePicker, setShowReminderTimePicker] = useState(false);
+
+  // Backup reminder state
+  const [backupReminderEnabled, setBackupReminderEnabled] = useState(false);
+  const [backupReminderFreq, setBackupReminderFreq] = useState('weekly'); // 'weekly' | 'monthly'
+  const [lastExportDate, setLastExportDate] = useState(null);
+
   // animation refs
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const splashTimerRef = useRef(false);
@@ -374,6 +413,121 @@ export default function App() {
       return { whole, decimal: null, separator: null };
     }
     return { whole, decimal: parts[1], separator: useEUFormat ? ',' : '.' };
+  };
+
+  // ============================================
+  // NOTIFICATION FUNCTIONS
+  // ============================================
+
+  // Configure notification handler
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
+  const requestNotificationPermissions = async () => {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      return finalStatus === 'granted';
+    } catch (error) {
+      console.log('Notification permission error:', error);
+      return false;
+    }
+  };
+
+  const scheduleDailyReminder = async (time) => {
+    try {
+      // Cancel existing daily reminder
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      
+      if (!dailyReminderEnabled) return;
+      
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        setDailyReminderEnabled(false);
+        return;
+      }
+
+      const hours = time.getHours();
+      const minutes = time.getMinutes();
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'moola',
+          body: 'Time to log your expenses ✦',
+          sound: true,
+        },
+        trigger: {
+          hour: hours,
+          minute: minutes,
+          repeats: true,
+        },
+      });
+      
+      console.log(`Daily reminder scheduled for ${hours}:${minutes}`);
+    } catch (error) {
+      console.log('Error scheduling notification:', error);
+    }
+  };
+
+  const toggleDailyReminder = async (enabled) => {
+    if (enabled) {
+      const hasPermission = await requestNotificationPermissions();
+      if (!hasPermission) {
+        // Could show an alert here
+        return;
+      }
+    }
+    setDailyReminderEnabled(enabled);
+  };
+
+  // ============================================
+  // BACKUP REMINDER HELPERS
+  // ============================================
+
+  const isBackupOverdue = () => {
+    if (!backupReminderEnabled || !lastExportDate) return false;
+    
+    const lastExport = new Date(lastExportDate);
+    const now = new Date();
+    const daysDiff = Math.floor((now - lastExport) / (1000 * 60 * 60 * 24));
+    
+    if (backupReminderFreq === 'weekly') {
+      return daysDiff >= 7;
+    } else {
+      return daysDiff >= 30;
+    }
+  };
+
+  const getBackupOverdueMessage = () => {
+    if (!lastExportDate) return 'You haven\'t backed up your data yet';
+    
+    const lastExport = new Date(lastExportDate);
+    const now = new Date();
+    const daysDiff = Math.floor((now - lastExport) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff === 1) return 'Last backup was yesterday';
+    return `Last backup was ${daysDiff} days ago`;
+  };
+
+  const updateLastExportDate = async () => {
+    const now = formatDate(new Date());
+    setLastExportDate(now);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LAST_EXPORT, now);
+    } catch (error) {
+      console.log('Error saving last export date:', error);
+    }
   };
 
   // ============================================
@@ -637,16 +791,25 @@ export default function App() {
     if (!isLoading && onboardingComplete) {
       savePreferences();
     }
-  }, [dark, name, onboardingComplete, currency, accentColor, useEUFormat, hideDecimals]);
+  }, [dark, name, onboardingComplete, currency, accentColor, useEUFormat, hideDecimals, dailyReminderEnabled, dailyReminderTime, backupReminderEnabled, backupReminderFreq]);
+
+  // Schedule daily reminder when settings change
+  useEffect(() => {
+    if (!isLoading && onboardingComplete) {
+      scheduleDailyReminder(dailyReminderTime);
+    }
+  }, [dailyReminderEnabled, dailyReminderTime]);
 
   const loadData = async () => {
     try {
-      const [expensesData, prefsData] = await Promise.all([
+      const [expensesData, prefsData, lastExportData] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.EXPENSES),
         AsyncStorage.getItem(STORAGE_KEYS.PREFERENCES),
+        AsyncStorage.getItem(STORAGE_KEYS.LAST_EXPORT),
       ]);
       
       if (expensesData) setExpenses(JSON.parse(expensesData));
+      if (lastExportData) setLastExportDate(lastExportData);
       
       if (prefsData) {
         const prefs = JSON.parse(prefsData);
@@ -667,6 +830,12 @@ export default function App() {
         
         if (prefs.useEUFormat !== undefined) setUseEUFormat(prefs.useEUFormat);
         if (prefs.hideDecimals !== undefined) setHideDecimals(prefs.hideDecimals);
+        
+        // Load reminder settings
+        if (prefs.dailyReminderEnabled !== undefined) setDailyReminderEnabled(prefs.dailyReminderEnabled);
+        if (prefs.dailyReminderTime) setDailyReminderTime(new Date(prefs.dailyReminderTime));
+        if (prefs.backupReminderEnabled !== undefined) setBackupReminderEnabled(prefs.backupReminderEnabled);
+        if (prefs.backupReminderFreq) setBackupReminderFreq(prefs.backupReminderFreq);
         
         if (prefs.onboardingComplete) setScreen('main');
       }
@@ -695,7 +864,11 @@ export default function App() {
         currency: currency.code,
         accentColor: accentColor.id, 
         useEUFormat, 
-        hideDecimals
+        hideDecimals,
+        dailyReminderEnabled,
+        dailyReminderTime: dailyReminderTime.toISOString(),
+        backupReminderEnabled,
+        backupReminderFreq,
       }));
     } catch (error) {
       console.log('Error saving preferences:', error);
@@ -919,6 +1092,7 @@ export default function App() {
       await FileSystem.writeAsStringAsync(filepath, csv, { encoding: 'utf8' });
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filepath, { mimeType: 'text/csv', dialogTitle: 'Export Expenses' });
+        await updateLastExportDate();
       }
       setShowExport(false);
     } catch (error) { 
@@ -929,6 +1103,7 @@ export default function App() {
   const exportCopy = async () => {
     try {
       await Clipboard.setStringAsync(generateCSV());
+      await updateLastExportDate();
       setShowExport(false);
     } catch (error) { 
       console.log('Copy error:', error); 
@@ -946,6 +1121,7 @@ export default function App() {
           dialogTitle: 'Save Expenses', 
           UTI: 'public.comma-separated-values-text' 
         });
+        await updateLastExportDate();
       }
       setShowExport(false);
     } catch (error) { 
@@ -989,6 +1165,41 @@ export default function App() {
             <Text style={{ fontSize: 14, color: t.text }}>App Lock</Text>
             <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
               {lockMethod === 'none' ? 'Disabled' : 'PIN enabled'}
+            </Text>
+          </View>
+        </View>
+        <ChevronIcon color={t.sub} />
+      </TouchableOpacity>
+
+      {/* Reminders Section */}
+      <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>REMINDERS</Text>
+
+      <TouchableOpacity 
+        onPress={() => setSettingsPage('reminders')} 
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <BellIcon color={t.soul} />
+          <View>
+            <Text style={{ fontSize: 14, color: t.text }}>Daily Reminder</Text>
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+              {dailyReminderEnabled ? `${dailyReminderTime.getHours()}:${String(dailyReminderTime.getMinutes()).padStart(2, '0')}` : 'Disabled'}
+            </Text>
+          </View>
+        </View>
+        <ChevronIcon color={t.sub} />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        onPress={() => setSettingsPage('backup')} 
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <CloudIcon color={t.soul} />
+          <View>
+            <Text style={{ fontSize: 14, color: t.text }}>Backup Reminder</Text>
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+              {backupReminderEnabled ? `Every ${backupReminderFreq === 'weekly' ? 'week' : 'month'}` : 'Disabled'}
             </Text>
           </View>
         </View>
@@ -1133,10 +1344,24 @@ export default function App() {
       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>SUPPORT</Text>
 
       <TouchableOpacity 
+        onPress={() => Linking.openURL(FEEDBACK_LINK)} 
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <MessageIcon color={t.soul} />
+          <View>
+            <Text style={{ fontSize: 14, color: t.text }}>Send Feedback</Text>
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Help us improve moola</Text>
+          </View>
+        </View>
+        <ChevronIcon color={t.sub} />
+      </TouchableOpacity>
+
+      <TouchableOpacity 
         onPress={() => Linking.openURL(SUPPORT_LINK)} 
         style={{ 
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
-          paddingVertical: 16, paddingHorizontal: 16,
+          paddingVertical: 16, paddingHorizontal: 16, marginTop: 12,
           backgroundColor: t.soulDim, borderRadius: 4,
           borderWidth: 1, borderColor: t.soul, borderStyle: 'dashed'
         }}
@@ -1304,6 +1529,239 @@ export default function App() {
           </Text>
         </View>
 
+      </ScrollView>
+    );
+  };
+
+  // Reminders Settings Page
+  const SettingsReminders = () => {
+    const formatTime = (date) => {
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+    };
+
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
+        <View style={{ alignItems: 'center', marginBottom: 32 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: t.soulDim, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+            <BellIcon color={t.soul} />
+          </View>
+          <Text style={{ fontSize: 13, color: t.sub, textAlign: 'center', fontStyle: 'italic', lineHeight: 20 }}>
+            Get a gentle nudge to log your daily expenses.
+          </Text>
+        </View>
+
+        {/* Enable/Disable Toggle */}
+        <TouchableOpacity 
+          onPress={() => toggleDailyReminder(!dailyReminderEnabled)} 
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <BellIcon color={dailyReminderEnabled ? t.soul : t.sub} />
+            <View>
+              <Text style={{ fontSize: 14, color: t.text }}>Daily Reminder</Text>
+              <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+                {dailyReminderEnabled ? 'Enabled' : 'Disabled'}
+              </Text>
+            </View>
+          </View>
+          <View style={{ width: 44, height: 24, borderRadius: 12, borderWidth: 1, borderColor: dailyReminderEnabled ? t.soul : t.border, backgroundColor: dailyReminderEnabled ? t.soulDim : 'transparent', justifyContent: 'center', paddingHorizontal: 2 }}>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: dailyReminderEnabled ? t.soul : t.muted, alignSelf: dailyReminderEnabled ? 'flex-end' : 'flex-start' }} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Time Picker */}
+        {dailyReminderEnabled && (
+          <>
+            <TouchableOpacity 
+              onPress={() => setShowReminderTimePicker(true)} 
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <ClockIcon color={t.soul} />
+                <View>
+                  <Text style={{ fontSize: 14, color: t.text }}>Reminder Time</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+                    When to remind you
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 14, color: t.soul, fontWeight: '500' }}>{formatTime(dailyReminderTime)}</Text>
+                <ChevronIcon color={t.sub} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Time Picker Modal */}
+            {showReminderTimePicker && (
+              <Modal visible={showReminderTimePicker} transparent animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                  <View style={{ backgroundColor: t.card, borderRadius: 12, width: '100%', maxWidth: 320, borderWidth: 1, borderColor: t.border }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                      <TouchableOpacity onPress={() => setShowReminderTimePicker(false)}>
+                        <Text style={{ color: t.sub, fontSize: 14 }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <Text style={{ color: t.text, fontSize: 15, fontWeight: '500' }}>Set Time</Text>
+                      <TouchableOpacity onPress={() => setShowReminderTimePicker(false)}>
+                        <Text style={{ color: t.soul, fontSize: 14, fontWeight: '500' }}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker 
+                      value={dailyReminderTime} 
+                      mode="time" 
+                      display="spinner" 
+                      onChange={(event, selectedDate) => { if (selectedDate) setDailyReminderTime(selectedDate); }} 
+                      themeVariant={dark ? 'dark' : 'light'} 
+                      style={{ height: 180 }} 
+                    />
+                  </View>
+                </View>
+              </Modal>
+            )}
+          </>
+        )}
+
+        {/* Info Box */}
+        <View style={{ backgroundColor: t.soulDim, padding: 16, borderRadius: 4, marginTop: 32 }}>
+          <Text style={{ fontSize: 12, color: t.text, fontWeight: '500', marginBottom: 8 }}>How it works</Text>
+          <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic' }}>
+            You'll receive a notification at your chosen time each day reminding you to log your expenses. Perfect for building a daily habit.
+          </Text>
+        </View>
+
+        {/* Preview */}
+        {dailyReminderEnabled && (
+          <View style={{ marginTop: 24, backgroundColor: t.card, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: t.border }}>
+            <Text style={{ fontSize: 10, color: t.sub, letterSpacing: 1, marginBottom: 8 }}>NOTIFICATION PREVIEW</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: t.soulDim, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 16 }}>✦</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: t.text, fontWeight: '500' }}>moola</Text>
+                <Text style={{ fontSize: 12, color: t.sub, marginTop: 2 }}>Time to log your expenses ✦</Text>
+              </View>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
+
+  // Backup Reminder Settings Page
+  const SettingsBackup = () => {
+    const getLastBackupText = () => {
+      if (!lastExportDate) return 'Never';
+      const lastExport = new Date(lastExportDate);
+      const now = new Date();
+      const daysDiff = Math.floor((now - lastExport) / (1000 * 60 * 60 * 24));
+      if (daysDiff === 0) return 'Today';
+      if (daysDiff === 1) return 'Yesterday';
+      return `${daysDiff} days ago`;
+    };
+
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24 }}>
+        <View style={{ alignItems: 'center', marginBottom: 32 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: t.soulDim, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+            <CloudIcon color={t.soul} />
+          </View>
+          <Text style={{ fontSize: 13, color: t.sub, textAlign: 'center', fontStyle: 'italic', lineHeight: 20 }}>
+            Keep your data safe with regular backups.
+          </Text>
+        </View>
+
+        {/* Last Backup Info */}
+        <View style={{ backgroundColor: t.card, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: t.border, marginBottom: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={{ fontSize: 10, color: t.sub, letterSpacing: 1, marginBottom: 4 }}>LAST BACKUP</Text>
+              <Text style={{ fontSize: 18, color: t.text, fontWeight: '300' }}>{getLastBackupText()}</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={() => { setShowSettings(false); setTimeout(() => setShowExport(true), 100); }}
+              style={{ paddingVertical: 10, paddingHorizontal: 16, backgroundColor: t.soul, borderRadius: 2 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 11, letterSpacing: 1 }}>BACKUP NOW</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Enable/Disable Toggle */}
+        <TouchableOpacity 
+          onPress={() => setBackupReminderEnabled(!backupReminderEnabled)} 
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <BellIcon color={backupReminderEnabled ? t.soul : t.sub} />
+            <View>
+              <Text style={{ fontSize: 14, color: t.text }}>Backup Reminder</Text>
+              <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>
+                {backupReminderEnabled ? 'Enabled' : 'Disabled'}
+              </Text>
+            </View>
+          </View>
+          <View style={{ width: 44, height: 24, borderRadius: 12, borderWidth: 1, borderColor: backupReminderEnabled ? t.soul : t.border, backgroundColor: backupReminderEnabled ? t.soulDim : 'transparent', justifyContent: 'center', paddingHorizontal: 2 }}>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: backupReminderEnabled ? t.soul : t.muted, alignSelf: backupReminderEnabled ? 'flex-end' : 'flex-start' }} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Frequency Selection */}
+        {backupReminderEnabled && (
+          <View style={{ paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}>
+            <Text style={{ fontSize: 10, color: t.sub, letterSpacing: 1, marginBottom: 12 }}>REMIND ME</Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                onPress={() => setBackupReminderFreq('weekly')}
+                style={{ 
+                  flex: 1, paddingVertical: 12, 
+                  borderWidth: 1, 
+                  borderColor: backupReminderFreq === 'weekly' ? t.soul : t.border, 
+                  borderRadius: 2, 
+                  backgroundColor: backupReminderFreq === 'weekly' ? t.soulDim : 'transparent',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: backupReminderFreq === 'weekly' ? t.soul : t.sub, fontSize: 12, letterSpacing: 1 }}>Weekly</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setBackupReminderFreq('monthly')}
+                style={{ 
+                  flex: 1, paddingVertical: 12, 
+                  borderWidth: 1, 
+                  borderColor: backupReminderFreq === 'monthly' ? t.soul : t.border, 
+                  borderRadius: 2, 
+                  backgroundColor: backupReminderFreq === 'monthly' ? t.soulDim : 'transparent',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: backupReminderFreq === 'monthly' ? t.soul : t.sub, fontSize: 12, letterSpacing: 1 }}>Monthly</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Info Box */}
+        <View style={{ backgroundColor: t.soulDim, padding: 16, borderRadius: 4, marginTop: 32 }}>
+          <Text style={{ fontSize: 12, color: t.text, fontWeight: '500', marginBottom: 8 }}>How it works</Text>
+          <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic' }}>
+            When your backup is overdue, you'll see a reminder banner on the main screen. Tap it to quickly export your data.
+          </Text>
+        </View>
+
+        {/* Privacy Note */}
+        <View style={{ backgroundColor: t.card, padding: 16, borderRadius: 4, marginTop: 16, borderWidth: 1, borderColor: t.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <ShieldIcon color={t.soul} />
+            <Text style={{ fontSize: 12, color: t.text, fontWeight: '500' }}>Your data stays local</Text>
+          </View>
+          <Text style={{ fontSize: 11, color: t.sub, lineHeight: 18, fontStyle: 'italic' }}>
+            Backups are exported as CSV files that you control. moola never uploads your data anywhere.
+          </Text>
+        </View>
       </ScrollView>
     );
   };
@@ -1899,6 +2357,29 @@ export default function App() {
             </View>
           </View>
 
+          {/* Backup Reminder Banner */}
+          {isBackupOverdue() && (
+            <TouchableOpacity 
+              onPress={() => setShowExport(true)}
+              style={{ 
+                marginHorizontal: 24, marginBottom: 16, padding: 14, 
+                backgroundColor: dark ? '#3a3020' : '#fdf8e8', 
+                borderRadius: 8, borderWidth: 1, 
+                borderColor: dark ? '#5a4830' : '#e8d8a8',
+                flexDirection: 'row', alignItems: 'center', gap: 12
+              }}
+            >
+              <CloudIcon color={dark ? '#d4a840' : '#a08020'} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: dark ? '#e8d090' : '#705810', fontWeight: '500' }}>Backup Reminder</Text>
+                <Text style={{ fontSize: 11, color: dark ? '#b0a070' : '#a09060', marginTop: 2, fontStyle: 'italic' }}>{getBackupOverdueMessage()}</Text>
+              </View>
+              <View style={{ paddingVertical: 6, paddingHorizontal: 12, backgroundColor: dark ? '#5a4830' : '#e8d8a8', borderRadius: 2 }}>
+                <Text style={{ color: dark ? '#e8d090' : '#705810', fontSize: 10, letterSpacing: 1 }}>EXPORT</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           {/* Time Progress Visualizations */}
           <View style={{ paddingHorizontal: 24, paddingBottom: 20 }}>
             {period === 'today' && (
@@ -2087,7 +2568,7 @@ export default function App() {
                   <View />
                 )}
                 <Text style={{ fontSize: 15, color: t.text, fontWeight: '500', letterSpacing: 1 }}>
-                  {settingsPage === 'main' ? 'Settings' : settingsPage === 'currency' ? 'Currency' : settingsPage === 'accent' ? 'Accent Color' : settingsPage === 'name' ? 'Name' : settingsPage === 'privacy' ? 'Privacy Policy' : settingsPage === 'security' ? 'App Lock' : 'About'}
+                  {settingsPage === 'main' ? 'Settings' : settingsPage === 'currency' ? 'Currency' : settingsPage === 'accent' ? 'Accent Color' : settingsPage === 'name' ? 'Name' : settingsPage === 'privacy' ? 'Privacy Policy' : settingsPage === 'security' ? 'App Lock' : settingsPage === 'reminders' ? 'Daily Reminder' : settingsPage === 'backup' ? 'Backup Reminder' : 'About'}
                 </Text>
                 <TouchableOpacity onPress={() => {
                   setShowSecuritySetup(false);
@@ -2104,6 +2585,8 @@ export default function App() {
               {settingsPage === 'privacy' && <SettingsPrivacy />}
               {settingsPage === 'about' && <SettingsAbout />}
               {settingsPage === 'security' && <SettingsSecurity />}
+              {settingsPage === 'reminders' && <SettingsReminders />}
+              {settingsPage === 'backup' && <SettingsBackup />}
             </SafeAreaView>
           </View>
         </Modal>
