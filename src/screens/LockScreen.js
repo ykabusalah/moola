@@ -20,8 +20,9 @@ export const LockScreen = () => {
 
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+  const [pinLength, setPinLength] = useState(4); // Default to 4, will update on mount
 
-  // Safety check: verify PIN actually exists on mount
+  // Safety check: verify PIN actually exists on mount and get its length
   useEffect(() => {
     const verifyPinExists = async () => {
       try {
@@ -32,6 +33,8 @@ export const LockScreen = () => {
           await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
           setLockMethod('none');
           setIsLocked(false);
+        } else if (storedPin) {
+          setPinLength(storedPin.length);
         }
       } catch (error) {
         console.log('Error verifying PIN:', error);
@@ -45,7 +48,7 @@ export const LockScreen = () => {
     if (key === 'delete') {
       setPinInput(prev => prev.slice(0, -1));
       setPinError('');
-    } else if (pinInput.length < 6) {
+    } else if (pinInput.length < pinLength) {
       setPinInput(prev => prev + key);
       setPinError('');
     }
@@ -107,7 +110,7 @@ export const LockScreen = () => {
 
         {/* PIN Dots */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 16 }}>
-          {[0, 1, 2, 3, 4, 5].map(i => (
+          {Array.from({ length: pinLength }, (_, i) => (
             <View 
               key={i} 
               style={{ 
@@ -152,14 +155,14 @@ export const LockScreen = () => {
         {/* Unlock Button */}
         <TouchableOpacity 
           onPress={handleLockScreenPinSubmit}
-          disabled={pinInput.length < 4}
+          disabled={pinInput.length !== pinLength}
           style={{ 
             marginTop: 24, paddingVertical: 14, paddingHorizontal: 48,
-            backgroundColor: pinInput.length >= 4 ? t.soul : t.muted, 
+            backgroundColor: pinInput.length === pinLength ? t.soul : t.muted, 
             borderRadius: 2 
           }}
         >
-          <Text style={{ color: pinInput.length >= 4 ? '#fff' : t.sub, fontSize: 12, letterSpacing: 2 }}>UNLOCK</Text>
+          <Text style={{ color: pinInput.length === pinLength ? '#fff' : t.sub, fontSize: 12, letterSpacing: 2 }}>UNLOCK</Text>
         </TouchableOpacity>
 
         {/* Emergency Reset */}
