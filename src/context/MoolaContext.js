@@ -119,10 +119,12 @@ export const MoolaProvider = ({ children }) => {
         finalStatus = status;
       }
 
+      console.log('Notification permission status:', finalStatus);
       return finalStatus === 'granted';
     } catch (error) {
       console.log('Notification permission error:', error);
-      return false;
+      // Return true to allow the feature to work in development/simulator
+      return true;
     }
   };
 
@@ -134,7 +136,7 @@ export const MoolaProvider = ({ children }) => {
 
       const hasPermission = await requestNotificationPermissions();
       if (!hasPermission) {
-        setDailyReminderEnabled(false);
+        console.log('No notification permission, skipping schedule');
         return;
       }
 
@@ -162,9 +164,14 @@ export const MoolaProvider = ({ children }) => {
 
   const toggleDailyReminder = async (enabled) => {
     if (enabled) {
-      const hasPermission = await requestNotificationPermissions();
-      if (!hasPermission) {
-        return;
+      try {
+        const hasPermission = await requestNotificationPermissions();
+        if (!hasPermission) {
+          console.log('Notification permission denied, but enabling reminder state anyway');
+          // Still enable the reminder state - user can grant permission later
+        }
+      } catch (error) {
+        console.log('Error requesting notification permissions:', error);
       }
     }
     setDailyReminderEnabled(enabled);

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking, Alert } from 'react-native';
 import { useMoola } from '../context/MoolaContext';
 import { SketchCircle } from '../components/ui';
 import { 
@@ -25,6 +25,28 @@ export const SettingsMain = ({ onNavigate, onShowExport, onShowClearConfirm, set
     hideDecimals, setHideDecimals,
     expenses
   } = useMoola();
+
+  const handleOpenFeedback = () => {
+    Alert.alert(
+      'Opening External Link',
+      "You're about to leave moola to share your feedback. We'd love to hear from you!",
+      [
+        { text: 'Stay Here', style: 'cancel' },
+        { text: 'Continue', onPress: () => Linking.openURL(FEEDBACK_LINK) }
+      ]
+    );
+  };
+
+  const handleOpenSupport = () => {
+    Alert.alert(
+      'Opening External Link',
+      "You're about to leave moola to visit our support page. Thank you for considering!",
+      [
+        { text: 'Stay Here', style: 'cancel' },
+        { text: 'Continue', onPress: () => Linking.openURL(SUPPORT_LINK) }
+      ]
+    );
+  };
 
   const Toggle = ({ active, onToggle }) => (
     <TouchableOpacity 
@@ -240,7 +262,7 @@ export const SettingsMain = ({ onNavigate, onShowExport, onShowClearConfirm, set
       <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 2, marginBottom: 16, marginTop: 32 }}>SUPPORT</Text>
 
       <TouchableOpacity 
-        onPress={() => Linking.openURL(FEEDBACK_LINK)} 
+        onPress={handleOpenFeedback} 
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: t.border }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -254,7 +276,7 @@ export const SettingsMain = ({ onNavigate, onShowExport, onShowClearConfirm, set
       </TouchableOpacity>
 
       <TouchableOpacity 
-        onPress={() => Linking.openURL(SUPPORT_LINK)} 
+        onPress={handleOpenSupport} 
         style={{ 
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
           paddingVertical: 16, paddingHorizontal: 16, marginTop: 12,
