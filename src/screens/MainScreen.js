@@ -148,8 +148,20 @@ export const MainScreen = () => {
                 <Svg width="100%" height={24} viewBox="0 0 300 24" preserveAspectRatio="none">
                   <Path d="M0,12 Q75,8 150,12 T300,12" stroke={t.muted} strokeWidth={2} fill="none" />
                   <Path d={`M0,12 Q${37.5 * Math.min(timeProgress * 4, 1)},${8 + (1 - Math.min(timeProgress * 4, 1)) * 4} ${75 * Math.min(timeProgress * 2, 1)},12 ${timeProgress > 0.5 ? `T${150 * Math.min(timeProgress * 1.33, 1)},12` : ''} ${timeProgress > 0.75 ? `T${timeProgress * 300},12` : ''}`} stroke={t.soul} strokeWidth={3} fill="none" strokeLinecap="round" />
-                  <Circle cx={Math.max(8, timeProgress * 292)} cy={12} r={5} fill={t.soul} opacity={0.9} />
-                  <Circle cx={Math.max(8, timeProgress * 292)} cy={12} r={8} fill={t.soul} opacity={0.2} />
+                  {/* Dot follows the line's endpoint */}
+                  {(() => {
+                    const dotX = timeProgress <= 0.5 
+                      ? 75 * Math.min(timeProgress * 2, 1)
+                      : timeProgress <= 0.75 
+                        ? 150 * Math.min(timeProgress * 1.33, 1)
+                        : timeProgress * 300;
+                    return (
+                      <>
+                        <Circle cx={Math.max(8, dotX)} cy={12} r={5} fill={t.soul} opacity={0.9} />
+                        <Circle cx={Math.max(8, dotX)} cy={12} r={8} fill={t.soul} opacity={0.2} />
+                      </>
+                    );
+                  })()}
                 </Svg>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                   <Text style={{ fontSize: 9, color: t.sub, letterSpacing: 1, fontStyle: 'italic' }}>{Math.round(timeProgress * 24)}h into today</Text>
