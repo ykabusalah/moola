@@ -22,12 +22,68 @@ export const ExportModal = ({ visible, onClose }) => {
   } = useMoola();
 
   const generateCSV = () => {
-    const header = 'Date,Amount,Currency,Note,Recurring,Frequency\n';
-    const rows = expenses.sort((a, b) => b.date.localeCompare(a.date)).map(e => {
-      const formattedAmount = useEUFormat ? e.amount.toFixed(2).replace('.', ',') : e.amount.toFixed(2);
-      return `${e.date},${formattedAmount},${currency.code},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`;
+    const formatAmount = (amount) => useEUFormat ? amount.toFixed(2).replace('.', ',') : amount.toFixed(2);
+    
+    // Sort expenses by date descending
+    const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
+    
+    // Individual expenses section (6 columns)
+    let csv = 'INDIVIDUAL EXPENSES,,,,,\n';
+    csv += 'Date,Amount,Currency,Note,Recurring,Frequency\n';
+    csv += sorted.map(e => {
+      return `${e.date},${formatAmount(e.amount)},${currency.code},"${e.note || ''}",${e.recurring ? 'Yes' : 'No'},${e.freq || ''}`;
     }).join('\n');
-    return header + rows;
+    
+    // Calculate daily totals
+    const dailyTotals = {};
+    expenses.forEach(e => {
+      dailyTotals[e.date] = (dailyTotals[e.date] || 0) + e.amount;
+    });
+    
+    // Calculate monthly totals
+    const monthlyTotals = {};
+    expenses.forEach(e => {
+      const month = e.date.substring(0, 7); // YYYY-MM
+      monthlyTotals[month] = (monthlyTotals[month] || 0) + e.amount;
+    });
+    
+    // Calculate yearly totals
+    const yearlyTotals = {};
+    expenses.forEach(e => {
+      const year = e.date.substring(0, 4); // YYYY
+      yearlyTotals[year] = (yearlyTotals[year] || 0) + e.amount;
+    });
+    
+    // Daily totals section (3 columns, padded to 6)
+    csv += '\n\nDAILY TOTALS,,,,,\n';
+    csv += 'Date,Total,Currency,,,\n';
+    csv += Object.entries(dailyTotals)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, total]) => `${date},${formatAmount(total)},${currency.code},,,`)
+      .join('\n');
+    
+    // Monthly totals section (3 columns, padded to 6)
+    csv += '\n\nMONTHLY TOTALS,,,,,\n';
+    csv += 'Month,Total,Currency,,,\n';
+    csv += Object.entries(monthlyTotals)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([month, total]) => `${month},${formatAmount(total)},${currency.code},,,`)
+      .join('\n');
+    
+    // Yearly totals section (3 columns, padded to 6)
+    csv += '\n\nYEARLY TOTALS,,,,,\n';
+    csv += 'Year,Total,Currency,,,\n';
+    csv += Object.entries(yearlyTotals)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, total]) => `${year},${formatAmount(total)},${currency.code},,,`)
+      .join('\n');
+    
+    // Grand total (padded to 6)
+    const grandTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
+    csv += '\n\nGRAND TOTAL,,,,,\n';
+    csv += `Total,${formatAmount(grandTotal)},${currency.code},,,`;
+    
+    return csv;
   };
 
   const exportShare = async () => {
