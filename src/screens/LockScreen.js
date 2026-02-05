@@ -66,18 +66,6 @@ export const LockScreen = () => {
     }
   };
 
-  const handleEmergencyReset = async () => {
-    try {
-      await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
-      await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
-      setLockMethod('none');
-      setIsLocked(false);
-      setPinInput('');
-    } catch (e) {
-      console.log('Reset error:', e);
-    }
-  };
-
   const NumKey = ({ value, onPress }) => (
     <TouchableOpacity 
       onPress={() => onPress(value)}
@@ -163,16 +151,6 @@ export const LockScreen = () => {
           }}
         >
           <Text style={{ color: pinInput.length === pinLength ? '#fff' : t.sub, fontSize: 12, letterSpacing: 2 }}>UNLOCK</Text>
-        </TouchableOpacity>
-
-        {/* Emergency Reset */}
-        <TouchableOpacity 
-          onPress={handleEmergencyReset}
-          style={{ marginTop: 40, padding: 12 }}
-        >
-          <Text style={{ fontSize: 12, color: t.sub, textDecorationLine: 'underline' }}>
-            Reset Lock (Emergency)
-          </Text>
         </TouchableOpacity>
       </SafeAreaView>
     </View>
