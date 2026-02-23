@@ -9,6 +9,13 @@ dist/
 web-build/
 expo-env.d.ts
 
+# EAS
+.eas/
+*.ipa
+*.apk
+*.aab
+credentials.json
+
 # Native
 .kotlin/
 *.orig.*
