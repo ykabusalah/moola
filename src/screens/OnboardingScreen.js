@@ -9,14 +9,16 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useMoola } from '../context/MoolaContext';
 import { SketchCircle, Divider } from '../components/ui';
-import { StarIcon } from '../components/icons';
+import { StarIcon, BellIcon, CloudIcon } from '../components/icons';
 import { formatDate, formatDisplayDate, getToday } from '../utils/date';
 
 export const OnboardingScreen = ({ fadeAnim, transition, completeOnboarding }) => {
-  const { 
-    t, dark, 
+  const {
+    t, dark,
     name, setName,
     onboardingStep,
+    dailyReminderEnabled, toggleDailyReminder,
+    backupReminderEnabled, setBackupReminderEnabled,
   } = useMoola();
 
   const [onboardingDate, setOnboardingDate] = useState(getToday());
@@ -106,7 +108,59 @@ export const OnboardingScreen = ({ fadeAnim, transition, completeOnboarding }) =
         </View>
       );
     }
-    
+
+    if (onboardingStep === 3) {
+      const Toggle = ({ active, onToggle }) => (
+        <TouchableOpacity
+          onPress={onToggle}
+          style={{ width: 44, height: 24, borderRadius: 12, borderWidth: 1, borderColor: active ? t.soul : t.border, backgroundColor: active ? t.soulDim : 'transparent', justifyContent: 'center', paddingHorizontal: 2 }}
+        >
+          <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: active ? t.soul : t.muted, alignSelf: active ? 'flex-end' : 'flex-start' }} />
+        </TouchableOpacity>
+      );
+
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', padding: 32 }}>
+          <View style={{ alignItems: 'center', marginBottom: 32 }}>
+            <BellIcon color={t.soul} />
+            <Text style={{ fontSize: 11, color: t.sub, marginTop: 16, letterSpacing: 3 }}>GENTLE NUDGES</Text>
+            <Text style={{ fontSize: 22, fontWeight: '400', color: t.text, marginTop: 12, textAlign: 'center' }}>Would you like reminders?</Text>
+            <Text style={{ fontSize: 13, color: t.sub, marginTop: 10, textAlign: 'center', fontStyle: 'italic', maxWidth: 280 }}>Both are off by default. You can change these anytime in Settings.</Text>
+          </View>
+
+          <View style={{ borderWidth: 1, borderColor: t.border, borderRadius: 4, padding: 18, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <BellIcon color={t.sub} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: t.text }}>Daily reminder</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>A quiet nudge to log your expenses</Text>
+                </View>
+              </View>
+              <Toggle active={dailyReminderEnabled} onToggle={() => toggleDailyReminder(!dailyReminderEnabled)} />
+            </View>
+          </View>
+
+          <View style={{ borderWidth: 1, borderColor: t.border, borderRadius: 4, padding: 18, marginBottom: 32 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <CloudIcon color={t.sub} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, color: t.text }}>Backup reminder</Text>
+                  <Text style={{ fontSize: 11, color: t.sub, marginTop: 2, fontStyle: 'italic' }}>Prompt to export your data periodically</Text>
+                </View>
+              </View>
+              <Toggle active={backupReminderEnabled} onToggle={() => setBackupReminderEnabled(!backupReminderEnabled)} />
+            </View>
+          </View>
+
+          <TouchableOpacity onPress={() => transition(4)} style={{ alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 44, backgroundColor: t.text, borderRadius: 2 }}>
+            <Text style={{ color: t.bg, fontSize: 12, letterSpacing: 2 }}>CONTINUE</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 40 }}>
@@ -131,7 +185,7 @@ export const OnboardingScreen = ({ fadeAnim, transition, completeOnboarding }) =
       <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
       <View style={{ flex: 1 }}>{renderStep()}</View>
       <View style={{ position: 'absolute', bottom: 40, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
-        {[0, 1, 2, 3].map(i => (
+        {[0, 1, 2, 3, 4].map(i => (
           <Svg key={i} width={12} height={12} viewBox="0 0 12 12">
             <Path d="M6,1 Q10,1 11,6 Q10,11 6,11 Q2,11 1,6 Q2,1 6,1" stroke={i <= onboardingStep ? t.soul : t.muted} fill={i === onboardingStep ? t.soul : 'none'} strokeWidth={1} />
           </Svg>

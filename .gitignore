@@ -33,6 +33,9 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# script preview outputs
+scripts/preview-*.png
+
 # macOS
 .DS_Store
 *.pem
