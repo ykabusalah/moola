@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>moola — quiet your coins</title>
+<meta name="description" content="moola is a private, offline expense tracker for iOS. No accounts, no cloud, no tracking.">
+<style>
+  :root {
+    --bg: #faf9f6;
+    --card: #ffffff;
+    --text: #2a251c;
+    --sub: #8a8070;
+    --border: #d4cfc4;
+    --accent: #5a7c4a;
+    --accent-dim: #e8f0e4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1114;
+      --card: #181b20;
+      --text: #e8e4dc;
+      --sub: #6b7280;
+      --border: #3a3f4a;
+      --accent: #6b9b54;
+      --accent-dim: #1a2e14;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .mark {
+    display: inline-block;
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 24px;
+  }
+  .mark svg { width: 100%; height: 100%; }
+  .mark .dot {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 10px; height: 10px;
+    background: var(--text);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  h1 {
+    font-size: 38px;
+    font-weight: 300;
+    letter-spacing: 6px;
+    margin: 0 0 8px;
+  }
+  .tagline {
+    color: var(--sub);
+    font-style: italic;
+    letter-spacing: 2px;
+    font-size: 13px;
+    margin: 0;
+  }
+  h2 {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin: 48px 0 16px;
+  }
+  p { font-size: 15px; color: var(--text); }
+  p.muted { color: var(--sub); }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 8px; font-size: 15px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-top: 16px;
+  }
+  .nav {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+  .nav a {
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 18px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+  }
+  .nav a:hover { text-decoration: none; background: var(--accent-dim); }
+  footer {
+    text-align: center;
+    color: var(--sub);
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 80px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M30,5 Q50,3 55,25 Q57,50 30,55 Q8,57 5,30 Q3,10 30,5"
+              stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <span class="dot"></span>
+    </div>
+    <h1>moola</h1>
+    <p class="tagline">quiet your coins</p>
+  </header>
+
+  <p>moola is a small, private expense tracker for iPhone.</p>
+  <p>No accounts. No cloud. No servers. Your data lives on your device and nowhere else. Everything about the app is designed around that single idea.</p>
+
+  <h2>What it does</h2>
+  <ul>
+    <li>Log expenses in seconds, with optional notes</li>
+    <li>Recurring expenses (weekly, monthly, yearly)</li>
+    <li>Views by day, week, month, or year</li>
+    <li>Optional daily reminders to log</li>
+    <li>Optional backup reminders to export</li>
+    <li>Face ID or PIN protection (off by default)</li>
+    <li>Light and dark mode</li>
+    <li>CSV export via share sheet</li>
+    <li>Fully offline</li>
+  </ul>
+
+  <h2>Why</h2>
+  <p>Most expense apps want your bank login or sync your history to servers you'll never see. moola doesn't. If it left your device, it wouldn't be yours anymore.</p>
+
+  <div class="nav">
+    <a href="privacy.html">Privacy Policy</a>
+    <a href="support.html">Support</a>
+  </div>
+
+  <footer>
+    &copy; 2026 Yousef Abu-Salah &middot; Your coins remain within this vessel.
+  </footer>
+</main>
+</body>
+</html>
