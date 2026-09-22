@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Support — moola</title>
 <meta name="description" content="Support and frequently asked questions for moola.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <style>
   :root {
     --bg: #faf9f6;
@@ -36,8 +37,34 @@
     -webkit-font-smoothing: antialiased;
   }
   main { max-width: 640px; margin: 0 auto; padding: 56px 24px 96px; }
-  .back { display: inline-block; color: var(--accent); text-decoration: none; font-size: 13px; letter-spacing: 1px; margin-bottom: 32px; }
-  .back:hover { text-decoration: underline; }
+  .topnav {
+    display: flex; gap: 18px; align-items: center;
+    margin-bottom: 32px; font-size: 13px; letter-spacing: 1px;
+  }
+  .topnav a { color: var(--accent); text-decoration: none; }
+  .topnav a:hover { text-decoration: underline; }
+  .topnav .sep { color: var(--border); }
+  .topnav .current { color: var(--sub); }
+  .topnav .current:hover { text-decoration: none; cursor: default; }
+  .coffee {
+    margin-top: 40px; padding: 28px 24px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    text-align: center;
+  }
+  .coffee h2 { margin: 0 0 8px; letter-spacing: 2px; text-align: center; }
+  .coffee p { color: var(--sub); font-size: 14px; margin: 0 0 20px; }
+  .coffee .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 24px; background: var(--accent); color: #fff;
+    border-radius: 3px; font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    text-decoration: none;
+  }
+  .coffee .btn:hover { text-decoration: none; opacity: 0.9; }
+  .coffee svg { width: 18px; height: 18px; }
+  .coffee .fine {
+    display: block; margin-top: 18px;
+    color: var(--sub); font-size: 12px; font-style: italic;
+  }
   h1 { font-size: 28px; font-weight: 400; margin: 0 0 6px; }
   .updated { color: var(--sub); font-size: 12px; font-style: italic; letter-spacing: 1px; margin: 0 0 40px; }
   h2 {
@@ -69,7 +96,13 @@
 </head>
 <body>
 <main>
-  <a href="index.html" class="back">&larr; moola</a>
+  <nav class="topnav">
+    <a href="index.html">&larr; moola</a>
+    <span class="sep">&middot;</span>
+    <a href="privacy.html">Privacy</a>
+    <span class="sep">&middot;</span>
+    <span class="current">Support</span>
+  </nav>
   <h1>Support</h1>
   <p class="updated">We keep this page short on purpose.</p>
 
@@ -118,6 +151,20 @@
   <div class="contact">
     <h2>Still stuck?</h2>
     <p>Email <a href="mailto:ykabusalah@gmail.com">ykabusalah@gmail.com</a> and I'll get back to you. Please include your iOS version and a short description of what happened.</p>
+  </div>
+
+  <div class="coffee">
+    <h2>Support the app</h2>
+    <p>moola is free and always will be. If it's helped you and you'd like to support future development, you can buy me a coffee.</p>
+    <a href="https://ko-fi.com/ykabusalah" target="_blank" rel="noopener noreferrer" class="btn">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 8h1a4 4 0 0 1 0 8h-1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6 1v3M10 1v3M14 1v3" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      Buy me a coffee
+    </a>
+    <span class="fine">Opens ko-fi.com in a new tab.</span>
   </div>
 
   <footer>&copy; 2026 Yousef Abu-Salah &middot; Your coins remain within this vessel.</footer>
