@@ -454,8 +454,34 @@ export const MoolaProvider = ({ children }) => {
 
   const clearAllData = async () => {
     try {
-      await AsyncStorage.multiRemove([STORAGE_KEYS.EXPENSES, STORAGE_KEYS.PREFERENCES]);
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.EXPENSES,
+        STORAGE_KEYS.PREFERENCES,
+        STORAGE_KEYS.LAST_EXPORT,
+      ]);
+      await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
+      await SecureStore.deleteItemAsync(SECURE_KEYS.LOCK_METHOD);
+      await Notifications.cancelAllScheduledNotificationsAsync();
+
+      setOnboardingComplete(false);
       setExpenses([]);
+      setName('');
+      setStartDate('');
+      setOnboardingStep(0);
+      setCurrency(CURRENCIES[0]);
+      setAccentColor(ACCENT_COLORS[0]);
+      setUseEUFormat(false);
+      setHideDecimals(false);
+      setDark(false);
+      setDailyReminderEnabled(false);
+      setDailyReminderTime(new Date(new Date().setHours(20, 0, 0, 0)));
+      setBackupReminderEnabled(false);
+      setBackupReminderFreq('weekly');
+      setLastExportDate(null);
+      setLockMethod('none');
+      setIsLocked(false);
+      setPeriod('today');
+      setScreen('onboarding');
     } catch (error) {
       console.log('Error clearing data:', error);
     }

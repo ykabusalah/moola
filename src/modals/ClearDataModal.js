@@ -12,8 +12,8 @@ export const ClearDataModal = ({ visible, onClose, onConfirm }) => {
   const { t, dark, expenses, clearAllData } = useMoola();
 
   const handleClear = async () => {
-    await clearAllData();
     onConfirm();
+    setTimeout(() => { clearAllData(); }, 250);
   };
 
   return (
@@ -24,7 +24,7 @@ export const ClearDataModal = ({ visible, onClose, onConfirm }) => {
             <TrashIcon color={dark ? '#c08080' : '#906060'} />
             <Text style={{ fontSize: 16, color: t.text, marginTop: 16, fontWeight: '500' }}>Clear All Data?</Text>
             <Text style={{ fontSize: 13, color: t.sub, marginTop: 8, textAlign: 'center', lineHeight: 20, fontStyle: 'italic' }}>
-              This will permanently delete all {expenses.length} expense records. This action cannot be undone.
+              This will permanently erase all {expenses.length} expense records along with your PIN, preferences, and reminders. moola will start fresh. This action cannot be undone.
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>

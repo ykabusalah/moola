@@ -327,7 +327,7 @@ export const MainScreen = () => {
           visible={showSettings} 
           onClose={() => setShowSettings(false)}
           onShowExport={() => { setShowSettings(false); setTimeout(() => setShowExport(true), 100); }}
-          onShowClearConfirm={() => setShowClearConfirm(true)}
+          onShowClearConfirm={() => { setShowSettings(false); setTimeout(() => setShowClearConfirm(true), 100); }}
           onShowPinSetup={() => { setShowSettings(false); setTimeout(() => setShowPinSetup(true), 100); }}
         />
 
