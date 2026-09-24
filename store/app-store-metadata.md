@@ -30,7 +30,7 @@ Click through the privacy questionnaire and mark **"Data Not Collected"** across
 If Apple asks about a specific SDK it detected:
 - `expo-notifications` uses **local notifications only**, no push tokens sent anywhere
 - `expo-secure-store` writes to the iOS Keychain, on-device only
-- `expo-local-authentication` uses Face ID / Touch ID prompts, on-device only
+- `expo-local-authentication` is bundled but not used for any user-facing feature in v1.0 (the app lock is PIN-only)
 
 None of these count as "Data Collection."
 
@@ -70,7 +70,7 @@ WHAT IT DOES
 • Views by day, week, month, and year with a running total
 • Optional daily reminder to log
 • Optional backup reminder to export your records
-• Face ID or PIN protection (off by default; enable it if you want it)
+• PIN lock (off by default; enable it if you want it)
 • 24 currency options and EU-style number formatting
 • 5 accent color themes
 • Light and dark mode
@@ -137,7 +137,7 @@ moola is a quiet, private way to track what you spend. Everything stays on your 
 • Log expenses with optional notes
 • Recurring expenses (weekly, monthly, yearly)
 • Views by day, week, month, and year
-• Optional Face ID or PIN protection
+• Optional PIN lock
 • Optional daily and backup reminders
 • 24 currencies, EU number format option
 • 5 accent color themes, light and dark mode
@@ -164,7 +164,7 @@ moola is a fully offline, local-only expense tracker.
 • No accounts, no sign-in, no server calls at any point in the app lifecycle.
 • All data is stored on-device using AsyncStorage and expo-secure-store (iOS Keychain).
 • No analytics, crash reporting, ad SDKs, or tracking of any kind.
-• Optional Face ID / PIN protection is disabled by default. Users may enable it in Settings > Security. If Face ID prompt appears during review, tap Cancel to skip.
+• Optional PIN lock is disabled by default. Users may enable it in Settings > Security.
 • Optional local notifications (daily log reminder, weekly/monthly backup reminder) are disabled by default and require explicit user opt-in during onboarding or later in Settings > Reminders.
 • The "Buy me a coffee" link in Settings > Support opens a Ko-fi page in Safari after showing a confirmation prompt. There is no in-app purchase.
 • The feedback link in Settings > Support opens an external Tally.so form in Safari after showing a confirmation prompt.
@@ -199,7 +199,7 @@ Recommended shots (3–6, in this order):
 3. Week or month view with the running total
 4. Onboarding step 3 (the notifications toggle screen)
 5. Settings screen showing the sections
-6. Lock screen (optional — shows Face ID / PIN protection)
+6. Lock screen (optional — shows PIN protection)
 
 Take on your iPhone via **Volume Up + Side button**. Airdrop or upload to your Mac/PC, then drag into ASC.
 
