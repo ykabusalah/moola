@@ -30,15 +30,15 @@ function iconAt(nativeW, nativeH, viewBox, transform) {
 
 const variants = [
   {
-    label: 'D. width=26, viewBox="-1 0 26 24", translate(-2, 0) — tip stroke leaks outside dashed box → CLIPPED',
+    label: 'D. width=26, viewBox="-1 0 26 24", translate(-2, 0): tip stroke leaks outside dashed box → CLIPPED',
     icon: iconAt(26, 24, '-1 0 26 24', 'translate(-2, 0)'),
   },
   {
-    label: 'E. width=28, viewBox="-2 0 28 24", translate(-2, 0) — tip has room, no clipping',
+    label: 'E. width=28, viewBox="-2 0 28 24", translate(-2, 0): tip has room, no clipping',
     icon: iconAt(28, 24, '-2 0 28 24', 'translate(-2, 0)'),
   },
   {
-    label: 'F. width=28, viewBox="-2.5 0 28 24", translate(-2, 0) — extra safety on the tip',
+    label: 'F. width=28, viewBox="-2.5 0 28 24", translate(-2, 0): extra safety on the tip',
     icon: iconAt(28, 24, '-2.5 0 28 24', 'translate(-2, 0)'),
   },
 ];

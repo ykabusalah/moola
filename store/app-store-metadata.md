@@ -1,4 +1,4 @@
-# moola — App Store Connect submission fields
+# moola: App Store Connect submission fields
 
 Copy-paste these into App Store Connect. Character counts noted for the fields Apple limits.
 
@@ -7,7 +7,7 @@ Copy-paste these into App Store Connect. Character counts noted for the fields A
 ## Basic
 
 - **App name**: `moola`
-- **Subtitle** (30 chars): `Quiet, offline expense tracker` — 30/30
+- **Subtitle** (30 chars): `Quiet, offline expense tracker` (30/30)
 - **Primary language**: English (U.S.)
 - **Bundle ID**: `com.ykabusalah.moola` (select from dropdown after first EAS build has uploaded)
 - **SKU**: `moola-001` (any unique string)
@@ -25,7 +25,7 @@ Copy-paste these into App Store Connect. Character counts noted for the fields A
 
 ## App Privacy
 
-Click through the privacy questionnaire and mark **"Data Not Collected"** across every category. This matches the app's actual behavior — no analytics, no crash reporting, no third-party SDKs, no data leaves the device.
+Click through the privacy questionnaire and mark **"Data Not Collected"** across every category. This matches the app's actual behavior: no analytics, no crash reporting, no third-party SDKs, and no data leaves the device.
 
 If Apple asks about a specific SDK it detected:
 - `expo-notifications` uses **local notifications only**, no push tokens sent anywhere
@@ -55,29 +55,25 @@ Answer **"None"** to every question in the age rating questionnaire. Result: **4
 ## Description (max 4000 chars)
 
 ```
-moola is a quiet, private way to track what you spend.
+moola is a simple, private way to track what you spend.
 
-No accounts. No cloud. No servers. Every expense you log stays on your device and nowhere else — that's the whole point.
+No accounts, no cloud, no servers. Every expense you log stays on your iPhone.
 
-If you've ever felt uneasy handing your bank login to another app, or watched an "expense tracker" ask permission to sync everything to the cloud, moola is the opposite of that. It doesn't want your data. It just helps you keep your own record.
-
-━━━━━━━━━━━━━━━━━━━━
+moola doesn't connect to your bank and doesn't sync anything online. You log what you spend, and it keeps a clear record for you.
 
 WHAT IT DOES
 
 • Log expenses in seconds, with optional notes
-• Recurring expenses — weekly, monthly, or yearly
-• Views by day, week, month, and year with a running total
+• Recurring expenses: weekly, monthly, or yearly
+• Day, week, month, and year views with a running total
 • Optional daily reminder to log
 • Optional backup reminder to export your records
-• PIN lock (off by default; enable it if you want it)
-• 24 currency options and EU-style number formatting
-• 5 accent color themes
+• Optional PIN lock, off by default
+• 24 currencies and EU-style number formatting
+• 5 accent colors
 • Light and dark mode
-• CSV export via the share sheet
-• Fully offline — works in airplane mode, on a plane, in a basement
-
-━━━━━━━━━━━━━━━━━━━━
+• CSV export through the share sheet
+• Works fully offline
 
 WHAT IT DOESN'T DO
 
@@ -88,22 +84,14 @@ WHAT IT DOESN'T DO
 • No third-party SDKs that collect data
 • No ads
 
-━━━━━━━━━━━━━━━━━━━━
+YOUR DATA STAYS ON YOUR PHONE
 
-WHY LOCAL-ONLY
+moola has no servers, so your records are never uploaded anywhere. Deleting the app deletes your data. To keep a backup, export a CSV from Settings.
 
-Because your financial history is yours. Not a growth metric. Not something to be modeled, sold, or used to train anything. Uninstall the app and every trace is gone.
-
-If you want a backup, you export a CSV. That's it.
-
-━━━━━━━━━━━━━━━━━━━━
-
-moola is free and always will be. If it helps you, and you'd like to support future work, there's a "Buy me a coffee" link in Settings — completely optional.
-
-"Your coins remain within this vessel."
+moola is free. If you'd like to support it, there's an optional "Buy me a coffee" link in Settings.
 ```
 
-Character count: ~1550. Well under the 4000 limit.
+Well under the 4000 character limit.
 
 ---
 
@@ -120,10 +108,10 @@ Character count: 96/100. Apple strips duplicates against your app name and descr
 ## Promotional Text (170 chars, editable without new review)
 
 ```
-Every version of moola stays quiet and private — your data lives only on your device. No accounts, no servers. Just you and your record.
+Log an expense in seconds. See your day, week, month, and year at a glance. No accounts, no cloud. Your records never leave your iPhone.
 ```
 
-Character count: 138/170.
+Character count: 136/170.
 
 ---
 
@@ -132,7 +120,7 @@ Character count: 138/170.
 ```
 First release.
 
-moola is a quiet, private way to track what you spend. Everything stays on your device — no accounts, no servers, no tracking.
+moola is a simple, private way to track what you spend. Everything stays on your device. No accounts, no servers, no tracking.
 
 • Log expenses with optional notes
 • Recurring expenses (weekly, monthly, yearly)
@@ -184,22 +172,22 @@ No demo credentials are needed. The app is fully usable on first launch after co
 
 ## Screenshots (you need these before submitting)
 
-Required sizes — take AT LEAST ONE of these:
+Required sizes (take AT LEAST ONE of these):
 
 | Device | Resolution | Aspect | Notes |
 |---|---|---|---|
-| iPhone 6.9" (iPhone 16 Pro Max) | 1320 x 2868 | portrait | Primary — recommended |
+| iPhone 6.9" (iPhone 16 Pro Max) | 1320 x 2868 | portrait | Primary, recommended |
 | iPhone 6.7" (iPhone 15 Pro Max) | 1290 x 2796 | portrait | Alternative |
 
-iPad screenshots **not required** — `supportsTablet` is now `false` in app.json.
+iPad screenshots **not required** because `supportsTablet` is `false` in app.json.
 
-Recommended shots (3–6, in this order):
+Recommended shots (3 to 6, in this order):
 1. Today view with a few expenses (looks lived-in)
 2. Add expense modal, mid-entry
 3. Week or month view with the running total
 4. Onboarding step 3 (the notifications toggle screen)
 5. Settings screen showing the sections
-6. Lock screen (optional — shows PIN protection)
+6. Lock screen (optional, shows PIN protection)
 
 Take on your iPhone via **Volume Up + Side button**. Airdrop or upload to your Mac/PC, then drag into ASC.
 
@@ -207,7 +195,7 @@ Take on your iPhone via **Volume Up + Side button**. Airdrop or upload to your M
 
 ## Encryption declaration
 
-Already handled — `ITSAppUsesNonExemptEncryption: false` is set in `app.json`. ASC won't ask you again.
+Already handled: `ITSAppUsesNonExemptEncryption: false` is set in `app.json`. ASC won't ask you again.
 
 ---
 
