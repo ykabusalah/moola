@@ -44,11 +44,11 @@ Answer **"None"** to every question in the age rating questionnaire. Result: **4
 
 ## URLs
 
-- **Support URL**: `https://ykabusalah.github.io/moola/support.html`
-- **Marketing URL** (optional): `https://ykabusalah.github.io/moola/`
-- **Privacy Policy URL**: `https://ykabusalah.github.io/moola/privacy.html`
+- **Support URL**: `https://moola.fyi/support.html`
+- **Marketing URL** (optional): `https://moola.fyi/`
+- **Privacy Policy URL**: `https://moola.fyi/privacy.html`
 
-> Hosted via GitHub Pages on the `moola` repo, `/docs` folder. To enable: repo &rarr; Settings &rarr; Pages &rarr; Source = "Deploy from a branch" &rarr; Branch: `main`, folder: `/docs` &rarr; Save. Live within ~1 minute at the URLs above.
+> Hosted on Vercel from the `docs/` folder of the `moola` repo (Root Directory = `docs`, no build step). Domain `moola.fyi` is registered at Porkbun, with A and CNAME records pointing at Vercel. Pushing to `main` redeploys the site.
 
 ---
 
