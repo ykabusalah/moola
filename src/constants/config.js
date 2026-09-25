@@ -15,7 +15,7 @@ export const STORAGE_KEYS = {
 
 export const SECURE_KEYS = {
   PIN: 'moola_pin',
-  LOCK_METHOD: 'moola_lock_method', // 'none' | 'pin' | 'biometric' | 'both'
+  LOCK_METHOD: 'moola_lock_method', // 'none' | 'pin'
 };
 
 // ============================================

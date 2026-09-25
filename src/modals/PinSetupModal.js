@@ -4,7 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useMoola } from '../context/MoolaContext';
 
@@ -13,6 +14,8 @@ export const PinSetupModal = ({ visible, onClose, initialMode = 'new', targetMet
     t, dark,
     savePin, saveLockMethod, verifyPin
   } = useMoola();
+  // SafeAreaView measures zero insets inside a full-screen Modal, so pad with the root provider's insets.
+  const insets = useSafeAreaInsets();
 
   const [pinInput, setPinInput] = useState('');
   const [tempPin, setTempPin] = useState('');
@@ -79,7 +82,7 @@ export const PinSetupModal = ({ visible, onClose, initialMode = 'new', targetMet
   return (
     <Modal visible={visible} animationType="fade">
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
           {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: t.border }}>
             <View />
@@ -169,7 +172,7 @@ export const PinSetupModal = ({ visible, onClose, initialMode = 'new', targetMet
               </Text>
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );

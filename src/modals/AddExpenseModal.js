@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useMoola } from '../context/MoolaContext';
@@ -15,6 +16,8 @@ export const AddExpenseModal = ({ visible, onClose, editingExpense }) => {
     t, dark, currency, todayStr,
     expenses, setExpenses,
   } = useMoola();
+  // SafeAreaView measures zero insets inside a full-screen Modal, so pad with the root provider's insets.
+  const insets = useSafeAreaInsets();
 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -102,7 +105,7 @@ export const AddExpenseModal = ({ visible, onClose, editingExpense }) => {
   return (
     <Modal visible={visible} animationType="fade">
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
           {showSuccess ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 28 }}>
               <Svg width={64} height={64} viewBox="0 0 64 64" style={{ marginBottom: 24 }}>
@@ -195,7 +198,7 @@ export const AddExpenseModal = ({ visible, onClose, editingExpense }) => {
               </View>
             </ScrollView>
           )}
-        </SafeAreaView>
+        </View>
         
         <Modal visible={showDatePicker} transparent animationType="fade">
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>

@@ -4,7 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useMoola } from '../context/MoolaContext';
 
@@ -20,6 +21,8 @@ import { SettingsAbout } from './SettingsAbout';
 
 export const SettingsModal = ({ visible, onClose, onShowExport, onShowClearConfirm, onShowPinSetup }) => {
   const { t } = useMoola();
+  // SafeAreaView measures zero insets inside a full-screen Modal, so pad with the root provider's insets.
+  const insets = useSafeAreaInsets();
 
   const [settingsPage, setSettingsPage] = useState('main');
   const [showSecuritySetup, setShowSecuritySetup] = useState(false);
@@ -53,7 +56,7 @@ export const SettingsModal = ({ visible, onClose, onShowExport, onShowClearConfi
   return (
     <Modal visible={visible} animationType="slide">
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <SafeAreaView style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: t.border }}>
             {settingsPage !== 'main' ? (
               <TouchableOpacity onPress={handleBack} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -96,7 +99,7 @@ export const SettingsModal = ({ visible, onClose, onShowExport, onShowClearConfi
           )}
           {settingsPage === 'reminders' && <SettingsReminders />}
           {settingsPage === 'backup' && <SettingsBackup onShowExport={onShowExport} />}
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );

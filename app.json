@@ -9,9 +9,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.ykabusalah.moola",
-      "buildNumber": "1",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Protect your financial data with Face ID.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

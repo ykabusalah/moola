@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { View, StatusBar, Animated, SafeAreaView } from 'react-native';
+import { View, StatusBar, Animated } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { MoolaProvider, useMoola } from './context/MoolaContext';
 import { SplashScreen } from './screens/SplashScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
@@ -89,8 +90,10 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <MoolaProvider>
-      <AppContent />
-    </MoolaProvider>
+    <SafeAreaProvider>
+      <MoolaProvider>
+        <AppContent />
+      </MoolaProvider>
+    </SafeAreaProvider>
   );
 }

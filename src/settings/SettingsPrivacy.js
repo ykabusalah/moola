@@ -19,7 +19,7 @@ export const SettingsPrivacy = () => {
         <ShieldIcon color={t.soul} />
         <Text style={{ fontSize: 18, color: t.text, marginTop: 16, fontWeight: '400' }}>Your Privacy Matters</Text>
         <Text style={{ fontSize: 12, color: t.sub, marginTop: 8, fontStyle: 'italic', textAlign: 'center' }}>
-          Last updated: January 2025
+          Last updated: September 2026
         </Text>
       </View>
 

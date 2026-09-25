@@ -1,6 +1,6 @@
 /**
  * icons/index.js - SVG icon components
- * All 18 icons used throughout the app (Export, Settings, Lock, etc.)
+ * SVG icons used throughout the app (Export, Settings, Lock, etc.)
  */
 
 import React from 'react';
@@ -92,15 +92,6 @@ export const LockIcon = ({ color }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24">
     <Rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke={color} strokeWidth="1.5" fill="none" />
     <Path d="M7 11V7a5 5 0 0110 0v4" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-  </Svg>
-);
-
-export const FaceIdIcon = ({ color }) => (
-  <Svg width={20} height={20} viewBox="0 0 24 24">
-    <Path d="M7 3H5a2 2 0 00-2 2v2M17 3h2a2 2 0 012 2v2M7 21H5a2 2 0 01-2-2v-2M17 21h2a2 2 0 002-2v-2" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    <Circle cx="9" cy="9" r="1" fill={color} />
-    <Circle cx="15" cy="9" r="1" fill={color} />
-    <Path d="M9 15c.83.67 2 1 3 1s2.17-.33 3-1" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 

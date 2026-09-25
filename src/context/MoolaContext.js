@@ -1,14 +1,13 @@
 /**
  * MoolaContext.js - Central state management for the app
  * Handles all shared state, persistence (AsyncStorage/SecureStore),
- * security (PIN/biometrics), notifications, and computed values
+ * security (PIN), notifications, and computed values
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
 
 import { STORAGE_KEYS, SECURE_KEYS } from '../constants/config';
@@ -65,9 +64,7 @@ export const MoolaProvider = ({ children }) => {
 
   // === Security ===
   const [isLocked, setIsLocked] = useState(false);
-  const [lockMethod, setLockMethod] = useState('none'); // 'none' | 'pin' | 'biometric' | 'both'
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricType, setBiometricType] = useState('');
+  const [lockMethod, setLockMethod] = useState('none'); // 'none' | 'pin'
 
   // === Reminders ===
   const [dailyReminderEnabled, setDailyReminderEnabled] = useState(false);
@@ -220,25 +217,6 @@ export const MoolaProvider = ({ children }) => {
   // SECURITY FUNCTIONS
   // ============================================
 
-  const checkBiometricAvailability = async () => {
-    try {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setBiometricAvailable(compatible && enrolled);
-
-      if (compatible) {
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-          setBiometricType('Face ID');
-        } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-          setBiometricType('Touch ID');
-        }
-      }
-    } catch (error) {
-      console.log('Biometric check error:', error);
-    }
-  };
-
   const loadSecuritySettings = async () => {
     try {
       const method = await SecureStore.getItemAsync(SECURE_KEYS.LOCK_METHOD);
@@ -303,29 +281,6 @@ export const MoolaProvider = ({ children }) => {
     }
   };
 
-  const authenticateWithBiometrics = async () => {
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock moola',
-        cancelLabel: 'Use PIN',
-        disableDeviceFallback: true,
-      });
-      return result.success;
-    } catch (error) {
-      console.log('Biometric auth error:', error);
-      return false;
-    }
-  };
-
-  const handleUnlock = useCallback(async () => {
-    if (lockMethod === 'biometric' || lockMethod === 'both') {
-      const success = await authenticateWithBiometrics();
-      if (success) {
-        setIsLocked(false);
-      }
-    }
-  }, [lockMethod]);
-
   const disableAppLock = async () => {
     try {
       await SecureStore.deleteItemAsync(SECURE_KEYS.PIN);
@@ -335,27 +290,6 @@ export const MoolaProvider = ({ children }) => {
     } catch (error) {
       console.log('Error disabling app lock:', error);
     }
-  };
-
-  const enableLockMethod = async (method) => {
-    if (method === 'none') {
-      await disableAppLock();
-      return { needsPinSetup: false };
-    }
-
-    const existingPin = await SecureStore.getItemAsync(SECURE_KEYS.PIN);
-
-    if (method === 'pin' || method === 'both') {
-      if (!existingPin) {
-        return { needsPinSetup: true };
-      }
-      await saveLockMethod(method);
-    } else if (method === 'biometric') {
-      if (biometricAvailable) {
-        await saveLockMethod(method);
-      }
-    }
-    return { needsPinSetup: false };
   };
 
   // ============================================
@@ -531,7 +465,6 @@ export const MoolaProvider = ({ children }) => {
   useEffect(() => {
     loadData();
     loadSecuritySettings();
-    checkBiometricAvailability();
   }, []);
 
   // Save expenses when changed
@@ -576,10 +509,6 @@ export const MoolaProvider = ({ children }) => {
         if (lockMethod !== 'none') {
           setIsLocked(true);
         }
-      } else if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        if (lockMethod !== 'none') {
-          handleUnlock();
-        }
       }
       appState.current = nextAppState;
     });
@@ -587,7 +516,7 @@ export const MoolaProvider = ({ children }) => {
     return () => {
       subscription.remove();
     };
-  }, [lockMethod, handleUnlock]);
+  }, [lockMethod]);
 
   // ============================================
   // CONTEXT VALUE
@@ -628,15 +557,10 @@ export const MoolaProvider = ({ children }) => {
     setIsLocked,
     lockMethod,
     setLockMethod,
-    biometricAvailable,
-    biometricType,
     saveLockMethod,
     savePin,
     verifyPin,
-    authenticateWithBiometrics,
-    handleUnlock,
     disableAppLock,
-    enableLockMethod,
 
     // === Reminders ===
     dailyReminderEnabled,
