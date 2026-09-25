@@ -143,7 +143,7 @@ moola is a simple, private way to track what you spend. Everything stays on your
   - First name: `Yousef`
   - Last name: `Abu-Salah`
   - Phone: (your number)
-  - Email: `ykabusalah@gmail.com`
+  - Email: `yousef@moola.fyi`
 - **Notes**:
 
 ```
